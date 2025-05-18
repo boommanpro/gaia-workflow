@@ -14,4 +14,13 @@ public enum NodeTypeEnum {
     ;
     private final String code;
     private final String description;
+
+    public static NodeTypeEnum of(String type) {
+        for (NodeTypeEnum nodeTypeEnum : NodeTypeEnum.values()) {
+            if (nodeTypeEnum.getCode().equals(type)) {
+                return nodeTypeEnum;
+            }
+        }
+        return null;
+    }
 }
