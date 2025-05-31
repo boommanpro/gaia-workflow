@@ -5,23 +5,21 @@ import cn.boommanpro.gaia.workflow.exception.ChainException;
 import cn.boommanpro.gaia.workflow.log.ChainNodeExecuteInfo;
 import cn.boommanpro.gaia.workflow.node.StartNode;
 import cn.boommanpro.gaia.workflow.param.Parameter;
+import cn.boommanpro.gaia.workflow.param.RefType;
 import cn.boommanpro.gaia.workflow.status.ChainDepStatus;
 import cn.boommanpro.gaia.workflow.status.ChainEdgeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainStatus;
 import cn.boommanpro.gaia.workflow.util.NamedThreadPools;
+import cn.hutool.json.JSONUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Phaser;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -41,7 +39,7 @@ public class Chain extends ChainNode {
 
     private Map<String, Object> outputResult;
     private Map<String, Object> executeResult;
-    private Map<String, Object> memory=new HashMap<>();
+    private Map<String, Object> memory = new HashMap<>();
     private ChainStatus chainStatus = ChainStatus.READY;
     protected Exception exception;
     private String message;
@@ -77,7 +75,10 @@ public class Chain extends ChainNode {
         return edges;
     }
 
-    public Map<String, Object> executeForResult(Map<String, Object> params) {
+    public Map<String, Object> executeForResult(Map<String, Object> variables) {
+        if (variables != null) {
+            this.memory.putAll(variables);
+        }
         ChainNode startNodes = getStartNodes(nodes);
         doExecuteChainNodes(Collections.singleton(startNodes));
         this.phaser.arriveAndAwaitAdvance();
@@ -122,13 +123,25 @@ public class Chain extends ChainNode {
                 Map<String, Object> execute = chainNode.execute(this);
                 try {
                     chainNode.setStatus(ChainNodeStatus.RUNNING);
-                    chainNodeExecuteInfo.setExecuteResult(execute);
+                    chainNodeExecuteInfo.setExecuteResult(JSONUtil.toJsonStr(execute));
                     List<Parameter> outputParameters = chainNode.getOutputParameters();
-                    Map<String, Object> outputResult = new HashMap<>();
-                    chainNodeExecuteInfo.setOutputResult(outputResult);
+                    Map<String, Object> outputResult = parseOutputResult(outputParameters, execute);
+                    chainNodeExecuteInfo.setOutputResult(JSONUtil.toJsonStr(outputResult));
+                    if (!outputResult.isEmpty()) {
+                        outputResult.entrySet().forEach(new Consumer<Map.Entry<String, Object>>() {
+                            @Override
+                            public void accept(Map.Entry<String, Object> entry) {
+                                getMemory().put(chainNode.getId() + "." + entry.getKey(), entry.getValue());
+                            }
+                        });
+                    }
                     chainNode.setStatus(ChainNodeStatus.FINISHED);
+                    this.executeResult = execute;
+                    this.outputResult = outputResult;
                 } catch (Exception e) {
                     chainNode.setStatus(ChainNodeStatus.FAILED);
+                    log.error("exec {} node {}, error:", chainNode.getNodeType(), chainNode.getId(), e);
+                    this.chainStatus= ChainStatus.FINISHED_ABNORMAL;
                 }
 
             }
@@ -155,9 +168,31 @@ public class Chain extends ChainNode {
                 }
             }
 
-
+            chainNodeExecuteInfo.setStatus(chainNode.getStatus());
             chainNodeExecuteInfo.setEndTime(System.currentTimeMillis());
         }
+    }
+
+    private Map<String, Object> parseOutputResult(List<Parameter> outputParameters, Map<String, Object> execute) {
+        Map<String, Object> result = new HashMap<>();
+        List<String> validParameters = new ArrayList<>();
+        for (Parameter parameter : outputParameters) {
+            Object value = null;
+            if (parameter.getRefType() == RefType.REF) {
+                value = execute.getOrDefault(String.join(".", parameter.getRefValue()), parameter.getDefaultValueString());
+            } else {
+                value = parameter.getDefaultValueString();
+            }
+            if (parameter.getIsPropertyRequired() && value == null) {
+                validParameters.add("参数 " + parameter.getName() + " 缺失");
+            }
+            result.put(parameter.getName(), value);
+        }
+        if (!validParameters.isEmpty()) {
+            throw new RuntimeException("参数验证失败：" + String.join(",", validParameters));
+        }
+
+        return result;
     }
 
     private ChainNode getByNodeId(String nodeId) {
@@ -192,5 +227,23 @@ public class Chain extends ChainNode {
     @Override
     public Map<String, Object> execute(Chain parent) {
         return executeForResult(parent.getMemory());
+    }
+
+    public Map<String, Object> getParametersData(ChainNode node) {
+        List<Parameter> parameters = node.getParameters();
+        Map<String, Object> result = new HashMap<>();
+        List<String> validParameters = new ArrayList<>();
+        for (Parameter parameter : parameters) {
+            Object value = getMemory().getOrDefault(parameter.getName(), parameter.getDefaultValueString());
+            if (parameter.getIsPropertyRequired() && value == null) {
+                validParameters.add("参数 " + parameter.getName() + " 缺失");
+            }
+            result.put(parameter.getName(), value);
+        }
+        if (!validParameters.isEmpty()) {
+            throw new RuntimeException("参数验证失败：" + String.join(",", validParameters));
+        }
+
+        return result;
     }
 }

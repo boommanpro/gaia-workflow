@@ -14,12 +14,12 @@ import cn.hutool.json.JSONObject;
 public abstract class BaseNodeParser<T extends ChainNode> implements NodeParser{
     @Override
     public ChainNode parse(JSONObject nodeJSONObject, GaiaWorkflow workflow) {
-        T t = buildInstance(workflow);
+        T t = buildInstance(nodeJSONObject,workflow);
         t.setId(nodeJSONObject.getStr("id"));
         t.setName(nodeJSONObject.getStr("name"));
         t.setNodeType(NodeTypeEnum.of(nodeJSONObject.getStr("type")));
         return t;
     }
 
-    public abstract T buildInstance(GaiaWorkflow workflow);
+    public abstract T buildInstance(JSONObject nodeJSONObject, GaiaWorkflow workflow);
 }

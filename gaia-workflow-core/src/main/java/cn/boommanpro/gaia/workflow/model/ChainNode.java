@@ -29,11 +29,11 @@ public abstract class ChainNode {
     public abstract Map<String,Object> execute(Chain chain);
 
     public List<Parameter> getParameters(){
-        return null;
+        return new ArrayList<>();
     }
 
     public List<Parameter> getOutputParameters(){
-        return null;
+        return new ArrayList<>();
     }
 
     public void addOutwardEdge(ChainEdge edge) {

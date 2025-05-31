@@ -1,8 +1,8 @@
 package cn.boommanpro.gaia.workflow.parser;
 
 import cn.boommanpro.gaia.workflow.GaiaWorkflow;
-import cn.boommanpro.gaia.workflow.model.ChainNode;
 import cn.boommanpro.gaia.workflow.node.StartNode;
+import cn.boommanpro.gaia.workflow.param.ParametersParseUtils;
 import cn.hutool.json.JSONObject;
 
 /**
@@ -13,8 +13,12 @@ import cn.hutool.json.JSONObject;
  */
 public class StartNodeParser extends BaseNodeParser<StartNode>{
 
+    private static final String jsonPath = "$.data.outputs.properties";
+
     @Override
-    public StartNode buildInstance(GaiaWorkflow workflow) {
-        return new StartNode();
+    public StartNode buildInstance(JSONObject nodeJSONObject, GaiaWorkflow workflow) {
+        StartNode startNode = new StartNode();
+        startNode.setOutputParameters(ParametersParseUtils.parseStartNodeParameters((JSONObject) nodeJSONObject.getByPath(jsonPath)));
+        return startNode;
     }
 }

@@ -1,0 +1,112 @@
+{
+  "nodes": [
+    {
+      "id": "start_0",
+      "type": "start",
+      "meta": {
+        "position": {
+          "x": 180,
+          "y": 0
+        }
+      },
+      "data": {
+        "title": "Start",
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "aa": {
+              "key": 4,
+              "name": "aa",
+              "isPropertyRequired": false,
+              "type": "integer",
+              "default": "1",
+              "extra": {
+                "index": 0
+              }
+            },
+            "ba": {
+              "key": 5,
+              "name": "ba",
+              "isPropertyRequired": false,
+              "type": "number",
+              "default": "2",
+              "extra": {
+                "index": 1
+              }
+            },
+            "ca": {
+              "key": 6,
+              "name": "ca",
+              "isPropertyRequired": false,
+              "type": "boolean",
+              "default": "3",
+              "extra": {
+                "index": 2
+              }
+            },
+            "da": {
+              "key": 7,
+              "name": "da",
+              "isPropertyRequired": false,
+              "type": "object",
+              "default": "4",
+              "extra": {
+                "index": 3
+              }
+            }
+          },
+          "required": []
+        },
+        "description": "start node"
+      }
+    },
+    {
+      "id": "end_0",
+      "type": "end",
+      "meta": {
+        "position": {
+          "x": 640,
+          "y": 0
+        }
+      },
+      "data": {
+        "title": "End",
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "integer",
+              "default": {
+                "type": "ref",
+                "content": [
+                  "start_0",
+                  "aa"
+                ]
+              }
+            }
+          }
+        },
+        "description": "end node"
+      }
+    },
+    {
+      "id": "note_48oopof_1748353844670",
+      "type": "note",
+      "meta": {
+        "position": {
+          "x": 180,
+          "y": 209
+        }
+      },
+      "data": {
+        "description": "注释"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeID": "start_0",
+      "targetNodeID": "end_0"
+    }
+  ]
+}

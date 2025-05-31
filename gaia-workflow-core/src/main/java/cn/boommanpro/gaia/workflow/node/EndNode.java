@@ -1,14 +1,12 @@
 package cn.boommanpro.gaia.workflow.node;
 
 import cn.boommanpro.gaia.workflow.model.Chain;
-import cn.boommanpro.gaia.workflow.param.Parameter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
 import java.util.Map;
 
 @Slf4j
-public class StartNode extends BaseNode {
+public class EndNode extends BaseNode {
 
     @Override
     public Map<String, Object> execute(Chain chain) {

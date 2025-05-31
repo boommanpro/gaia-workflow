@@ -15,7 +15,7 @@ public class ChainNodeExecuteInfo {
     private ChainNodeStatus status;
     private Long startTime;
     private Long endTime;
-    private Map<String, Object> executeResult;
-    private Map<String, Object> outputResult;
+    private String  executeResult;
+    private String outputResult;
     private List<String> inwardEdges=new ArrayList<>();
 }

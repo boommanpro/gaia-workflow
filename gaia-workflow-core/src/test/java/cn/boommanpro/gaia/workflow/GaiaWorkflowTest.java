@@ -12,15 +12,15 @@ import java.util.Map;
 public class GaiaWorkflowTest {
 
     @Test
-    public void execute() {
-        String content = IoUtil.read(new ClassPathResource("full_run.json").getStream(), StandardCharsets.UTF_8);
+    public void  onlyStartEnd() {
+        String content = IoUtil.read(new ClassPathResource("only_start_end.json").getStream(), StandardCharsets.UTF_8);
         GaiaWorkflow gaiaWorkflow = new GaiaWorkflow(content);
         Chain chain = gaiaWorkflow.toChain();
         HashMap<String, Object> params = new HashMap<>();
-        params.put("a", "1");
-        params.put("b", "2");
-        params.put("c", "3");
-        params.put("d", "4");
+        params.put("aa", "1");
+        params.put("ba", "2");
+        params.put("ca", "3");
+        params.put("da", "4");
         Map<String, Object> result = chain.executeForResult(params);
         System.out.println(result);
         System.out.println(chain.getExecuteInfoMap());

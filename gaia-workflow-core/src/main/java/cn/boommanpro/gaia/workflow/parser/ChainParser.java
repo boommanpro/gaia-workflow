@@ -32,9 +32,10 @@ public class ChainParser {
         initParserMap();
     }
 
+
     public void initParserMap() {
         nodeParserMap.put(NodeTypeEnum.START.getCode(), new StartNodeParser());
-        nodeParserMap.put(NodeTypeEnum.END.getCode(), new StartNodeParser());
+        nodeParserMap.put(NodeTypeEnum.END.getCode(), new EndNodeParser());
         nodeParserMap.put(NodeTypeEnum.CONDITION.getCode(), new StartNodeParser());
         nodeParserMap.put(NodeTypeEnum.CODE.getCode(), new StartNodeParser());
     }
@@ -44,6 +45,9 @@ public class ChainParser {
         for (int i = 0; i < nodes.size(); i++) {
             JSONObject nodeJSONObject = nodes.getJSONObject(i);
             String type = nodeJSONObject.getStr("type");
+            if (NodeTypeEnum.NOTE.getCode().equals(type)) {
+                continue;
+            }
             ChainNode node = nodeParserMap.get(type).parse(nodeJSONObject, workflow);
             chain.addNode(node);
         }

@@ -15,13 +15,13 @@ import java.util.List;
 @Data
 public abstract class BaseNode extends ChainNode {
     protected List<Parameter> parameters;
-    protected List<Parameter> outputDefs;
+    protected List<Parameter> outputParameters;
 
     public List<Parameter> addParameter() {
         return parameters;
     }
 
     public List<Parameter> addOutDefs() {
-        return outputDefs;
+        return outputParameters;
     }
 }
