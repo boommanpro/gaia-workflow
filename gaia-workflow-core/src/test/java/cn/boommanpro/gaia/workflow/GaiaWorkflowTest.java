@@ -12,7 +12,7 @@ import java.util.Map;
 public class GaiaWorkflowTest {
 
     @Test
-    public void  onlyStartEnd() {
+    public void  onlyStartEndTest() {
         String content = IoUtil.read(new ClassPathResource("only_start_end.json").getStream(), StandardCharsets.UTF_8);
         GaiaWorkflow gaiaWorkflow = new GaiaWorkflow(content);
         Chain chain = gaiaWorkflow.toChain();
@@ -27,8 +27,18 @@ public class GaiaWorkflowTest {
     }
 
     @Test
-    public void test02() {
-
+    public void codeTest() {
+        String content = IoUtil.read(new ClassPathResource("code.json").getStream(), StandardCharsets.UTF_8);
+        GaiaWorkflow gaiaWorkflow = new GaiaWorkflow(content);
+        Chain chain = gaiaWorkflow.toChain();
+        HashMap<String, Object> params = new HashMap<>();
+        params.put("aa", "1");
+        params.put("ba", "2");
+        params.put("ca", "3");
+        params.put("da", "4");
+        Map<String, Object> result = chain.executeForResult(params);
+        System.out.println(result);
+        System.out.println(chain.getExecuteInfoMap());
     }
 
 }

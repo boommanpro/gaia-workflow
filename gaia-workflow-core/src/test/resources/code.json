@@ -17,12 +17,13 @@
             "aa": {
               "key": 4,
               "name": "aa",
-              "isPropertyRequired": false,
+              "isPropertyRequired": true,
               "type": "integer",
               "default": "1",
               "extra": {
                 "index": 0
-              }
+              },
+              "description": "123"
             },
             "ba": {
               "key": 5,
@@ -48,14 +49,19 @@
               "key": 7,
               "name": "da",
               "isPropertyRequired": false,
-              "type": "object",
+              "type": "array",
               "default": "4",
               "extra": {
                 "index": 3
+              },
+              "items": {
+                "type": "string"
               }
             }
           },
-          "required": []
+          "required": [
+            "aa"
+          ]
         },
         "description": "start node"
       }
@@ -65,7 +71,7 @@
       "type": "end",
       "meta": {
         "position": {
-          "x": 640,
+          "x": 1610,
           "y": 0
         }
       },
@@ -101,11 +107,44 @@
       "data": {
         "description": "注释"
       }
+    },
+    {
+      "id": "code_XD3DH",
+      "type": "code",
+      "meta": {
+        "position": {
+          "x": 575,
+          "y": 151.5
+        }
+      },
+      "data": {
+        "title": "Code_1",
+        "description": "代码组件",
+        "config": {
+          "language": "java",
+          "code": ""
+        },
+        "inputs": {
+          "type": "object"
+        },
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "result": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   ],
   "edges": [
     {
       "sourceNodeID": "start_0",
+      "targetNodeID": "code_XD3DH"
+    },
+    {
+      "sourceNodeID": "code_XD3DH",
       "targetNodeID": "end_0"
     }
   ]
