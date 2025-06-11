@@ -11,6 +11,7 @@ import cn.boommanpro.gaia.workflow.status.ChainEdgeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainStatus;
 import cn.boommanpro.gaia.workflow.util.NamedThreadPools;
+import cn.hutool.core.text.StrFormatter;
 import cn.hutool.json.JSONUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -113,6 +114,7 @@ public class Chain extends ChainNode {
             updateCurrentNodeStatus(chainNode);
             ChainNodeExecuteInfo chainNodeExecuteInfo = executeInfoMap.get(chainNode.getId());
             chainNode.setStatus(chainNodeExecuteInfo.getStatus());
+            chainNodeExecuteInfo.trigger();
             if (chainNode.getStatus() == ChainNodeStatus.WAIT) {
                 return;
             }
@@ -120,8 +122,8 @@ public class Chain extends ChainNode {
             chainNodeExecuteInfo.setInwardEdges(chainNode.getInwardEdges().stream().filter(chainEdge -> chainEdge.getStatus() == ChainEdgeStatus.TRUE).map(ChainEdge::getId).collect(Collectors.toList()));
 
             if (chainNodeExecuteInfo.getStatus() == ChainNodeStatus.READY) {
-                Map<String, Object> execute = chainNode.execute(this);
                 try {
+                    Map<String, Object> execute = chainNode.execute(this);
                     chainNode.setStatus(ChainNodeStatus.RUNNING);
                     chainNodeExecuteInfo.setExecuteResult(JSONUtil.toJsonStr(execute));
                     List<Parameter> outputParameters = chainNode.getOutputParameters();
@@ -141,6 +143,8 @@ public class Chain extends ChainNode {
                 } catch (Exception e) {
                     chainNode.setStatus(ChainNodeStatus.FAILED);
                     log.error("exec {} node {}, error:", chainNode.getNodeType(), chainNode.getId(), e);
+                    chainNodeExecuteInfo.setStatus(ChainNodeStatus.FAILED);
+                    chainNodeExecuteInfo.setExecuteResult(StrFormatter.format("exec {} node {}, error:", chainNode.getNodeType(), chainNode.getId(), e.getMessage()));
                     this.chainStatus= ChainStatus.FINISHED_ABNORMAL;
                 }
 
@@ -179,11 +183,11 @@ public class Chain extends ChainNode {
         for (Parameter parameter : outputParameters) {
             Object value = null;
             if (parameter.getRefType() == RefType.REF) {
-                value = execute.getOrDefault(String.join(".", parameter.getRefValue()), parameter.getDefaultValueString());
+                value = execute.getOrDefault(String.join(".", parameter.getRefValue()), parameter.getDefaultValue());
             } else {
-                value = parameter.getDefaultValueString();
+                value = parameter.getDefaultValue();
             }
-            if (parameter.getIsPropertyRequired() && value == null) {
+            if (parameter.isRequire() && value == null) {
                 validParameters.add("参数 " + parameter.getName() + " 缺失");
             }
             result.put(parameter.getName(), value);
@@ -234,8 +238,8 @@ public class Chain extends ChainNode {
         Map<String, Object> result = new HashMap<>();
         List<String> validParameters = new ArrayList<>();
         for (Parameter parameter : parameters) {
-            Object value = getMemory().getOrDefault(parameter.getName(), parameter.getDefaultValueString());
-            if (parameter.getIsPropertyRequired() && value == null) {
+            Object value = getMemory().getOrDefault(parameter.getName(), parameter.getDefaultValue());
+            if (parameter.isRequire() && value == null) {
                 validParameters.add("参数 " + parameter.getName() + " 缺失");
             }
             result.put(parameter.getName(), value);

@@ -6,7 +6,7 @@ import java.util.Map;
 
 @Data
 public class GaiaExecParam {
-    private String content;
+    private String graph;
     private Map<String, Object> params;
 
 }

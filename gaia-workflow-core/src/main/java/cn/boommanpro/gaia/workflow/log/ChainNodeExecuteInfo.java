@@ -13,9 +13,16 @@ import java.util.Map;
 public class ChainNodeExecuteInfo {
     private String id;
     private ChainNodeStatus status;
+    private Long triggerTime;
     private Long startTime;
     private Long endTime;
     private String  executeResult;
     private String outputResult;
     private List<String> inwardEdges=new ArrayList<>();
+
+    public void trigger() {
+        if (triggerTime == null) {
+            triggerTime = System.currentTimeMillis();
+        }
+    }
 }

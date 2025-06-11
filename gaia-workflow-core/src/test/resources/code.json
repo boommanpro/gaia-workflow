@@ -85,8 +85,8 @@
               "default": {
                 "type": "ref",
                 "content": [
-                  "start_0",
-                  "aa"
+                  "code_XD3DH",
+                  "a"
                 ]
               }
             }
@@ -122,15 +122,51 @@
         "description": "代码组件",
         "config": {
           "language": "java",
-          "code": ""
+          "code": "return {\n    \"a\":a,\n    \"b\":b\n}"
+        },
+        "inputsValues": {
+          "a": {
+            "type": "ref",
+            "content": [
+              "start_0",
+              "a"
+            ]
+          },
+          "b": {
+            "type": "constant",
+            "content": "1"
+          }
         },
         "inputs": {
-          "type": "object"
+          "type": "object",
+          "properties": {
+            "a": {
+              "key": 4,
+              "name": "a",
+              "isPropertyRequired": true,
+              "type": "integer",
+              "default": "1",
+              "extra": {
+                "index": 0
+              },
+              "description": "123"
+            },
+            "b": {
+              "key": 5,
+              "name": "b",
+              "isPropertyRequired": false,
+              "type": "number",
+              "default": "2",
+              "extra": {
+                "index": 1
+              }
+            }
+          }
         },
         "outputs": {
           "type": "object",
           "properties": {
-            "result": {
+            "a": {
               "type": "string"
             }
           }

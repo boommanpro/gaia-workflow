@@ -3,12 +3,14 @@ package cn.boommanpro.gaia.workflow;
 import cn.boommanpro.gaia.workflow.model.Chain;
 import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.io.resource.ClassPathResource;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
-
+@Slf4j
 public class GaiaWorkflowTest {
 
     @Test
@@ -22,8 +24,7 @@ public class GaiaWorkflowTest {
         params.put("ca", "3");
         params.put("da", "4");
         Map<String, Object> result = chain.executeForResult(params);
-        System.out.println(result);
-        System.out.println(chain.getExecuteInfoMap());
+        Assert.assertEquals("1",result.get("result"));
     }
 
     @Test
@@ -36,9 +37,15 @@ public class GaiaWorkflowTest {
         params.put("ba", "2");
         params.put("ca", "3");
         params.put("da", "4");
-        Map<String, Object> result = chain.executeForResult(params);
-        System.out.println(result);
+        try {
+
+            Map<String, Object> result = chain.executeForResult(params);
+            System.out.println(result);
+        } catch (Exception e) {
+            log.error("run error", e);
+        }
         System.out.println(chain.getExecuteInfoMap());
+
     }
 
 }

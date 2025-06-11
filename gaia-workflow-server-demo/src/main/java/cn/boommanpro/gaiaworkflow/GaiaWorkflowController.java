@@ -9,11 +9,12 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("api/gaia")
+@RequestMapping("workflow")
+@CrossOrigin(origins = "*", maxAge = 3600) // 添加跨域支持
 public class GaiaWorkflowController {
     @PostMapping("exec")
     public Map<String, Object> exec( @RequestBody GaiaExecParam param) {
-        GaiaWorkflow gaiaWorkflow = new GaiaWorkflow(param.getContent());
+        GaiaWorkflow gaiaWorkflow = new GaiaWorkflow(param.getGraph());
         Chain chain = gaiaWorkflow.toChain();
         return chain.executeForResult(param.getParams());
     }

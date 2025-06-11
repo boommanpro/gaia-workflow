@@ -7,6 +7,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class ParametersParseUtils {
+    //end使用
     public static List<Parameter> parse(JSONObject nodeJSONObject) {
         List<Parameter> parameters = new ArrayList<>();
 
@@ -21,13 +22,13 @@ public class ParametersParseUtils {
                 JSONObject refValue = (JSONObject) value;
                 parameter.setRefValue(refValue.getJSONArray("content").stream().map(Object::toString).collect(Collectors.toList()));
             } else {
-                parameter.setDefaultValueString(paramJson.getStr("default"));
+                parameter.setDefaultValue(paramJson.getStr("default"));
                 parameter.setRefType(RefType.CONSTANT);
             }
             if (StrUtil.isBlank(parameter.getName())) {
                 parameter.setName(entry.getKey());
             }
-            parameter.setIsPropertyRequired(Optional.ofNullable(paramJson.getBool("isPropertyRequired")).orElse(false));
+            parameter.setRequire(Optional.ofNullable(paramJson.getBool("isPropertyRequired")).orElse(false));
             parameter.setType(DataType.ofValue(paramJson.getStr("type")));
             parameters.add(parameter);
         }
@@ -35,6 +36,7 @@ public class ParametersParseUtils {
         return parameters;
     }
 
+    //start 使用
     public static List<Parameter> parseStartNodeParameters(JSONObject nodeJSONObject) {
         List<Parameter> parameters = new ArrayList<>();
 
@@ -45,8 +47,8 @@ public class ParametersParseUtils {
             parameter.setName(paramJson.getStr("name"));
             parameter.setRefType(RefType.REF);
             parameter.setRefValue(Arrays.asList(paramJson.getStr("name")));
-            parameter.setDefaultValueString(paramJson.getStr("default"));
-            parameter.setIsPropertyRequired(Optional.ofNullable(paramJson.getBool("isPropertyRequired")).orElse(false));
+            parameter.setDefaultValue(paramJson.getStr("default"));
+            parameter.setRequire(Optional.ofNullable(paramJson.getBool("isPropertyRequired")).orElse(false));
             parameter.setType(DataType.ofValue(paramJson.getStr("type")));
             parameters.add(parameter);
         }

@@ -9,11 +9,13 @@ import java.util.List;
 @Data
 public class Parameter {
     private String name;
-    private Boolean isPropertyRequired=false;
+    private boolean require;
     private DataType type;
-    private String defaultValueString;
     private String description;
     private RefType refType;
+    //默认值
+    private Object defaultValue;
+    //ref 链接
     private List<String> refValue;
-
+    private List<Parameter> children;
 }
