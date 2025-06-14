@@ -54,4 +54,9 @@ public class JsFunExecNode extends CodeNode {
             }
         }
     }
+
+    @Override
+    protected Map<String, Object> getParametersData(Chain chain) {
+        return chain.getParametersData(this);
+    }
 }

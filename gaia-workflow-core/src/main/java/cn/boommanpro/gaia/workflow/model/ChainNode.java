@@ -6,6 +6,7 @@ import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import lombok.Data;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -42,5 +43,9 @@ public abstract class ChainNode {
 
     public void addInwardEdge(ChainEdge edge) {
         inwardEdges.add(edge);
+    }
+
+    protected Map<String,Object> getParametersData(Chain chain) {
+        return new HashMap<>();
     }
 }

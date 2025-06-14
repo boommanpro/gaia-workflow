@@ -123,6 +123,7 @@ public class Chain extends ChainNode {
 
             if (chainNodeExecuteInfo.getStatus() == ChainNodeStatus.READY) {
                 try {
+                    chainNodeExecuteInfo.setInputsResult(JSONUtil.toJsonStr(chainNode.getParametersData(this)));
                     Map<String, Object> execute = chainNode.execute(this);
                     chainNode.setStatus(ChainNodeStatus.RUNNING);
                     chainNodeExecuteInfo.setExecuteResult(JSONUtil.toJsonStr(execute));
