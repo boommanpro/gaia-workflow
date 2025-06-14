@@ -5,16 +5,12 @@ import cn.boommanpro.gaia.workflow.node.CodeNode;
 import cn.boommanpro.gaia.workflow.node.JsFunExecNode;
 import cn.boommanpro.gaia.workflow.param.DataType;
 import cn.boommanpro.gaia.workflow.param.Parameter;
-import cn.boommanpro.gaia.workflow.param.ParametersParseUtils;
 import cn.boommanpro.gaia.workflow.param.RefType;
-import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * 代码功能
@@ -25,34 +21,46 @@ import java.util.Optional;
 public class CodeNodeParser extends BaseNodeParser<CodeNode> {
 
     private static final String inputsJsonPath = "$.data.inputs.properties";
+    private static final String inputsValuesJsonPath = "$.data.inputsValues";
     private static final String outputsJsonPath = "$.data.outputs.properties";
+    private static final String outputsValuesJsonPath = "$.data.outputsValues";
 
     @Override
     public JsFunExecNode buildInstance(JSONObject nodeJSONObject, GaiaWorkflow workflow) {
         JsFunExecNode codeNode = new JsFunExecNode((String) nodeJSONObject.getByPath("$.data.config.code"));
-        codeNode.setParameters(ParametersParseUtils.parse((JSONObject) nodeJSONObject.getByPath(inputsJsonPath)));
-        codeNode.setOutputParameters(parse((JSONObject) nodeJSONObject.getByPath(outputsJsonPath)));
+        codeNode.setParameters(parseNodeParameters((JSONObject) nodeJSONObject.getByPath(inputsJsonPath),(JSONObject) nodeJSONObject.getByPath(inputsValuesJsonPath)));
+        codeNode.setOutputParameters(parseNodeParameters((JSONObject) nodeJSONObject.getByPath(outputsJsonPath),(JSONObject) nodeJSONObject.getByPath(outputsValuesJsonPath)));
         return codeNode;
     }
-
-    public static List<Parameter> parse(JSONObject nodeJSONObject) {
+    public static List<Parameter> parseNodeParameters(JSONObject schemaObject, JSONObject valueMapObject) {
         List<Parameter> parameters = new ArrayList<>();
 
-        for (Map.Entry<String, Object> entry : nodeJSONObject.entrySet()) {
+        for (Map.Entry<String, Object> entry : schemaObject.entrySet()) {
             JSONObject paramJson = (JSONObject) entry.getValue();
-
+            String key = entry.getKey();
             Parameter parameter = new Parameter();
-            parameter.setName(paramJson.getStr("name"));
-            Object value = paramJson.get("default");
-            parameter.setRefType(RefType.REF);
-            JSONObject refValue = (JSONObject) value;
-            parameter.setRefValue(Arrays.asList(entry.getKey()));
-
-            if (StrUtil.isBlank(parameter.getName())) {
-                parameter.setName(entry.getKey());
-            }
-            parameter.setRequire(Optional.ofNullable(paramJson.getBool("isPropertyRequired")).orElse(false));
+            parameter.setName(key);
             parameter.setType(DataType.ofValue(paramJson.getStr("type")));
+            JSONObject valueObject = valueMapObject.getJSONObject(key);
+            if (valueObject == null) {
+                parameter.setRefType(RefType.REF);
+                parameter.setRefValue(Arrays.asList(key));
+            }else {
+                parameter.setRefType(RefType.from(valueObject.getStr("type")));
+                if (parameter.getRefType() == RefType.REF) {
+                    parameter.setRefValue(valueObject.getJSONArray("content").stream().map(new Function<Object, String>() {
+                        @Override
+                        public String apply(Object o) {
+                            return o.toString();
+                        }
+                    }).collect(Collectors.toList()));
+                }else {
+
+                    parameter.setDefaultValue(valueObject.getStr("content"));
+                }
+            }
+
+            parameter.setRequire(Optional.ofNullable(paramJson.getBool("isPropertyRequired")).orElse(false));
             parameters.add(parameter);
         }
 

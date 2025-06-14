@@ -32,25 +32,4 @@ public class GaiaWorkflowTest {
         Assert.assertEquals("2",result.get("hello"));
     }
 
-    @Test
-    public void codeTest() {
-        String content = IoUtil.read(new ClassPathResource("code.json").getStream(), StandardCharsets.UTF_8);
-        GaiaWorkflow gaiaWorkflow = new GaiaWorkflow(content);
-        Chain chain = gaiaWorkflow.toChain();
-        HashMap<String, Object> params = new HashMap<>();
-        params.put("aa", "1");
-        params.put("ba", "2");
-        params.put("ca", "3");
-        params.put("da", "4");
-        try {
-
-            Map<String, Object> result = chain.executeForResult(params);
-            System.out.println(result);
-        } catch (Exception e) {
-            log.error("run error", e);
-        }
-        System.out.println(chain.getExecuteInfoMap());
-
-    }
-
 }

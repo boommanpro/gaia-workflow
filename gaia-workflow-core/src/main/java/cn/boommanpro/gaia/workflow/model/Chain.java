@@ -238,7 +238,15 @@ public class Chain extends ChainNode {
         Map<String, Object> result = new HashMap<>();
         List<String> validParameters = new ArrayList<>();
         for (Parameter parameter : parameters) {
-            Object value = getMemory().getOrDefault(parameter.getName(), parameter.getDefaultValue());
+            Object value = null;
+            if (parameter.getRefType()== RefType.REF) {
+                value = getMemory().get(String.join(".", parameter.getRefValue()) );
+            }else {
+                value = parameter.getDefaultValue();
+            }
+            if (value == null) {
+                value = parameter.getDefaultValue();
+            }
             if (parameter.isRequire() && value == null) {
                 validParameters.add("参数 " + parameter.getName() + " 缺失");
             }
