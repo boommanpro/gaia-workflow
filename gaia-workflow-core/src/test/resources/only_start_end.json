@@ -14,48 +14,23 @@
         "outputs": {
           "type": "object",
           "properties": {
-            "aa": {
-              "key": 4,
-              "name": "aa",
-              "isPropertyRequired": false,
-              "type": "integer",
-              "default": "1",
-              "extra": {
-                "index": 0
-              }
+            "a": {
+              "type": "string",
+              "default": "1"
             },
-            "ba": {
-              "key": 5,
-              "name": "ba",
-              "isPropertyRequired": false,
-              "type": "number",
-              "default": "2",
-              "extra": {
-                "index": 1
-              }
+            "b": {
+              "type": "string",
+              "default": "2"
             },
-            "ca": {
-              "key": 6,
-              "name": "ca",
-              "isPropertyRequired": false,
-              "type": "boolean",
-              "default": "3",
-              "extra": {
-                "index": 2
-              }
+            "c": {
+              "type": "string",
+              "default": "3"
             },
-            "da": {
-              "key": 7,
-              "name": "da",
-              "isPropertyRequired": false,
-              "type": "object",
-              "default": "4",
-              "extra": {
-                "index": 3
-              }
+            "d": {
+              "type": "string",
+              "default": "4"
             }
-          },
-          "required": []
+          }
         },
         "description": "start node"
       }
@@ -65,28 +40,36 @@
       "type": "end",
       "meta": {
         "position": {
-          "x": 640,
-          "y": 0
+          "x": 180,
+          "y": 209
         }
       },
       "data": {
         "title": "End",
-        "outputs": {
-          "type": "object",
-          "properties": {
-            "result": {
-              "type": "integer",
-              "default": {
-                "type": "ref",
-                "content": [
-                  "start_0",
-                  "aa"
-                ]
-              }
-            }
+        "description": "end node",
+        "inputsValues": {
+          "result": {
+            "type": "constant",
+            "content": "123"
+          },
+          "hello": {
+            "type": "ref",
+            "content": [
+              "start_0",
+              "b"
+            ]
           }
         },
-        "description": "end node"
+        "inputs": {
+          "properties": {
+            "result": {
+              "type": "string"
+            },
+            "hello": {
+              "type": "string"
+            }
+          }
+        }
       }
     },
     {
@@ -95,7 +78,7 @@
       "meta": {
         "position": {
           "x": 180,
-          "y": 209
+          "y": 383
         }
       },
       "data": {

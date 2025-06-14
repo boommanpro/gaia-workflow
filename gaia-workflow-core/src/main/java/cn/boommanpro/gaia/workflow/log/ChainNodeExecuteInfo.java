@@ -16,6 +16,7 @@ public class ChainNodeExecuteInfo {
     private Long triggerTime;
     private Long startTime;
     private Long endTime;
+    private String inputData;
     private String  executeResult;
     private String outputResult;
     private List<String> inwardEdges=new ArrayList<>();

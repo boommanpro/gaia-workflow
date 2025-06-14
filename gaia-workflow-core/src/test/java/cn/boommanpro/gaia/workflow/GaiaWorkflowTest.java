@@ -24,7 +24,8 @@ public class GaiaWorkflowTest {
         params.put("ca", "3");
         params.put("da", "4");
         Map<String, Object> result = chain.executeForResult(params);
-        Assert.assertEquals("1",result.get("result"));
+        Assert.assertEquals("123",result.get("result"));
+        Assert.assertEquals("2",result.get("hello"));
     }
 
     @Test

@@ -11,4 +11,14 @@ public enum RefType {
     ;
 
     private final String value;
+
+    public static RefType from(String type) {
+        //
+        for (RefType refType : RefType.values()) {
+            if (refType.value.equals(type)) {
+                return refType;
+            }
+        }
+        return null;
+    }
 }
