@@ -136,7 +136,7 @@ public class ChainParser {
     private ChainNode findStartNode(Chain chain, Map<String, Set<String>> nodeUpstreams) {
         for (ChainNode node : chain.getNodes()) {
             // 开始节点没有上游节点
-            if (!nodeUpstreams.containsKey(node.getId()) && node.getNodeType() == NodeTypeEnum.START) {
+            if (node.getInwardEdges().isEmpty()) {
                 return node;
             }
         }

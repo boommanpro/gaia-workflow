@@ -12,9 +12,4 @@ public class EndNode extends BaseNode {
     public Map<String, Object> execute(Chain chain) {
         return chain.getMemory();
     }
-
-    @Override
-    protected Map<String, Object> getParametersData(Chain chain) {
-        return chain.getMemory();
-    }
 }

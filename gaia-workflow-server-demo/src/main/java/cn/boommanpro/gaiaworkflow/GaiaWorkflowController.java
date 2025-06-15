@@ -32,7 +32,24 @@ public class GaiaWorkflowController {
         } catch (Exception e) {
             return CommonResult.error(e);
         }
-
-
     }
+
+    @PostMapping("singleNodeRun")
+    public CommonResult<WorkflowExecuteDetailVo> singleNodeRun(@RequestBody GaiaExecParam param) {
+        GaiaWorkflow gaiaWorkflow = new GaiaWorkflow(param.getGraph());
+        try {
+            Chain chain = gaiaWorkflow.toChain();
+            Map<String, Object> result = null;
+            try {
+                result = chain.executeForResult(param.getParams());
+            } catch (Exception e) {
+                log.info("error", e);
+            }
+            Map<String, ChainNodeExecuteInfo> executeInfoMap = chain.getExecuteInfoMap();
+            return CommonResult.success(new WorkflowExecuteDetailVo(result, executeInfoMap));
+        } catch (Exception e) {
+            return CommonResult.error(e);
+        }
+    }
+    
 }

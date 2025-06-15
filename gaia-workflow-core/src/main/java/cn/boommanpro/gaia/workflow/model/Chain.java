@@ -223,7 +223,7 @@ public class Chain extends ChainNode {
         return nodes.stream().filter(new Predicate<ChainNode>() {
             @Override
             public boolean test(ChainNode chainNode) {
-                return chainNode instanceof StartNode;
+                return chainNode.getInwardEdges().isEmpty();
             }
         }).findFirst().orElseThrow(() -> new RuntimeException("没有找到开始节点"));
     }
