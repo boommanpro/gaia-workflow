@@ -8,7 +8,7 @@ import cn.hutool.json.JSONObject;
 /**
  * 代码功能
  *
- * @author <a href="mailto:wangqimeng03@meituan.com">wangqimeg03</a>
+ * @author <a href="mailto:boommanpro@gmail.com">boommanpro</a>
  * @date 2025/05/17 13:00
  */
 public abstract class BaseNodeParser<T extends ChainNode> implements NodeParser{
