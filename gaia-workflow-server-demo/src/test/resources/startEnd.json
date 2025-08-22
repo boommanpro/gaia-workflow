@@ -1,0 +1,90 @@
+{
+  "nodes": [
+    {
+      "id": "start_0",
+      "type": "start",
+      "meta": {
+        "position": {
+          "x": 180,
+          "y": 0
+        }
+      },
+      "data": {
+        "title": "Start",
+        "outputs": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "default": "Hello Flow."
+            },
+            "enable": {
+              "type": "boolean",
+              "default": true
+            },
+            "array_obj": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "int": {
+                    "type": "number"
+                  },
+                  "str": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "end_0",
+      "type": "end",
+      "meta": {
+        "position": {
+          "x": 640,
+          "y": 0
+        }
+      },
+      "data": {
+        "title": "End",
+        "inputsValues": {
+          "success": {
+            "type": "constant",
+            "content": true,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          "query": {
+            "type": "ref",
+            "content": [
+              "start_0",
+              "query"
+            ]
+          }
+        },
+        "inputs": {
+          "type": "object",
+          "properties": {
+            "success": {
+              "type": "boolean"
+            },
+            "query": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeID": "start_0",
+      "targetNodeID": "end_0"
+    }
+  ]
+}

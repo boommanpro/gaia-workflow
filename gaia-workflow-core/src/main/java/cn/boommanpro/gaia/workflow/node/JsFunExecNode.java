@@ -28,7 +28,6 @@ public class JsFunExecNode extends CodeNode {
     private static final String funcWrapper = "function jsFunc(){%s};\njsFunc();";
     @Override
     public Map<String, Object> execute( Chain chain) {
-        log.info("exec code node id:{}",this.getId());
         ScriptEngine engine = (new ScriptEngineManager()).getEngineByName("graal.js");
         if (engine == null) {
             throw new RuntimeException("未找到 GraalJS 引擎，请确认依赖配置");
