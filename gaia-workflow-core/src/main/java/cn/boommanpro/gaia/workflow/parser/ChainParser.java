@@ -10,12 +10,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -44,7 +39,7 @@ public class ChainParser {
         for (int i = 0; i < nodes.size(); i++) {
             JSONObject nodeJSONObject = nodes.getJSONObject(i);
             String type = nodeJSONObject.getStr("type");
-            if (NodeTypeEnum.NOTE.getCode().equals(type)) {
+            if (NodeTypeEnum.NOTE.getCode().equals(type)||NodeTypeEnum.COMMENT.getCode().equals(type)) {
                 continue;
             }
             ChainNode node = nodeParserMap.get(type).parse(nodeJSONObject, workflow);
