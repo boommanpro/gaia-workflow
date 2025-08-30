@@ -12,7 +12,8 @@ public enum NodeTypeEnum {
     CONDITION("condition", "条件节点"),
     CODE("code", "代码节点"),
     NOTE("note", "注释节点"),
-    COMMENT("comment", "评论节点")
+    COMMENT("comment", "评论节点"),
+    BRANCHES("branches", "分支节点")
     ;
     private final String code;
     private final String description;
