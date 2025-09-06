@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
     <modules>
         <module>gaia-workflow-core</module>
-        <module>gaia-workflow-server-demo</module>
+        <module>gaia-workflow-server</module>
     </modules>
 
     <properties>
