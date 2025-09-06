@@ -5,7 +5,7 @@ import lombok.Data;
 /**
  * 代码功能
  *
- * @author <a href="mailto:wangqimeng03@meituan.com">wangqimeg03</a>
+ * @author <a href="mailto:boommanpro@gmail.com">boommanpro</a>
  * @date 2025/08/22 13:53
  */
 @Data
