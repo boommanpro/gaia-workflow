@@ -13,6 +13,9 @@ import cn.boommanpro.gaiaworkflow.model.TaskInfo;
 import cn.hutool.json.JSONUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -27,18 +30,33 @@ import java.util.UUID;
  * @date 2025/08/22 15:35
  */
 @Component
-public class GaiaWorkflowExecutor implements WorkflowExecutor {
+public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContextAware {
 
     private static final Logger logger = LoggerFactory.getLogger(GaiaWorkflowExecutor.class);
 
+    private ApplicationContext applicationContext;
+
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        this.applicationContext = applicationContext;
+    }
+
     @Override
     public Map<String, Object> execute(String schema, Map<String, Object> inputs) {
+        long startTime = System.currentTimeMillis();
         try {
             // 使用GaiaWorkflow执行工作流
             GaiaWorkflow workflow = createWorkflow(schema);
-            return workflow.run(inputs);
+            Map<String, Object> result = workflow.run(inputs);
+
+            // 记录测试调用日志
+            recordTestCallLog(schema, inputs, result, startTime, null,workflow);
+
+            return result;
         } catch (Exception e) {
             logger.error("执行工作流失败", e);
+            // 记录测试调用日志（包含错误信息）
+            recordTestCallLog(schema, inputs, null, startTime, e,null);
             throw e;
         }
     }
@@ -71,6 +89,88 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor {
         logger.error("工作流执行异常", e);
         updateTaskStatusToFailed(taskInfo);
         recordErrorMessage(taskInfo, e);
+    }
+
+    /**
+     * 记录测试调用日志
+     *
+     * @param schema    工作流Schema
+     * @param inputs    输入参数
+     * @param outputs   输出结果
+     * @param startTime 开始时间
+     * @param exception 异常信息（如果有的话）
+     * @param workflow
+     */
+    private void recordTestCallLog(String schema, Map<String, Object> inputs, Map<String, Object> outputs, long startTime, Exception exception, GaiaWorkflow workflow) {
+        try {
+            // 解析工作流编码和版本ID（从schema中获取）
+            String workflowCode = parseWorkflowCodeFromSchema(schema);
+            Long versionId = parseVersionIdFromSchema(schema);
+            String workflowContent = schema;
+
+            // 计算耗时
+            long costTime = System.currentTimeMillis() - startTime;
+
+            // 准备日志字段
+            String execParam = JSONUtil.toJsonStr(inputs);
+            String execStatus = (exception == null) ? "SUCCESS" : "FAILED";
+            String reports = JSONUtil.toJsonStr(workflow.getNodeReports()); // 可以从工作流执行中获取更详细的报告
+            String callResult = (outputs != null) ? JSONUtil.toJsonStr(outputs) : "";
+            String errorMessage = (exception != null) ? exception.getMessage() : "";
+
+            // 通过ApplicationContext获取TestCallLogRecorder并记录日志
+            try {
+                Object testCallLogRecorder = applicationContext.getBean("testCallLogRecorderImpl");
+                if (testCallLogRecorder != null) {
+                    testCallLogRecorder.getClass().getMethod("recordTestCallLog",
+                            String.class, Long.class, String.class, Long.class,
+                            String.class, String.class, String.class, String.class, String.class)
+                        .invoke(testCallLogRecorder,
+                                workflowCode, versionId, workflowContent,
+                                costTime, execParam, execStatus,
+                                reports, callResult, errorMessage);
+                }
+            } catch (Exception e) {
+                // 如果获取或调用Bean失败，则仅记录到日志中
+                logger.info("Test call log - WorkflowCode: {}, VersionId: {}, CostTime: {}ms, Status: {}, Error: {}",
+                           workflowCode, versionId, costTime, execStatus, errorMessage);
+            }
+
+        } catch (Exception e) {
+            logger.error("记录测试调用日志失败", e);
+        }
+    }
+
+    /**
+     * 从Schema中解析工作流编码
+     *
+     * @param schema 工作流Schema
+     * @return 工作流编码
+     */
+    private String parseWorkflowCodeFromSchema(String schema) {
+        try {
+            // 简单实现，实际可能需要从Schema中提取特定字段
+            return "workflow_" + System.currentTimeMillis();
+        } catch (Exception e) {
+            logger.warn("解析工作流编码失败", e);
+            return "unknown_workflow";
+        }
+    }
+
+    /**
+     * 从Schema中解析版本ID
+     *
+     * @param schema 工作流Schema
+     * @return 版本ID
+     */
+    private Long parseVersionIdFromSchema(String schema) {
+        try {
+            // 简单实现，实际可能需要从Schema中提取特定字段
+            return System.currentTimeMillis();
+        } catch (Exception e) {
+            logger.warn("解析版本ID失败", e);
+            return -1L;
+        }
     }
 
     /**
@@ -309,4 +409,3 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor {
         }
     }
 }
-
