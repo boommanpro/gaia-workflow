@@ -62,17 +62,37 @@ public class GaiaWorkflow {
      * @return 节点执行报告
      */
     public Map<String, NodeReport> getNodeReports() {
+        // 确保工作流已经执行过，如果chain还未初始化则先执行一次
         Chain chain = toChain();
         Map<String, ChainNodeExecuteInfo> executeInfoMap = chain.getExecuteInfoMap();
         Map<String, NodeReport> nodeReports = new HashMap<>();
 
         executeInfoMap.forEach((nodeId, info) -> {
             String status = info.getStatus() != null ? info.getStatus().name() : "UNKNOWN";
+            
+            // 创建包含执行信息的 snapshots
+            List<Object> snapshots = new ArrayList<>();
+            
+            // 创建一个包含节点执行信息的快照对象
+            Map<String, Object> snapshot = new HashMap<>();
+            snapshot.put("id", nodeId);
+            snapshot.put("status", status);
+            snapshot.put("triggerTime", info.getTriggerTime());
+            snapshot.put("startTime", info.getStartTime());
+            snapshot.put("endTime", info.getEndTime());
+            snapshot.put("inputsResult", info.getInputsResult());
+            snapshot.put("executeResult", info.getExecuteResult());
+            snapshot.put("outputResult", info.getOutputResult());
+            snapshot.put("inwardEdges", info.getInwardEdges());
+            
+            snapshots.add(snapshot);
+            
             NodeReport report = new NodeReport(
                     nodeId,
                     status,
                     info.getStartTime(),
-                    info.getEndTime(), new ArrayList<>()
+                    info.getEndTime(),
+                    snapshots
             );
             nodeReports.put(nodeId, report);
         });

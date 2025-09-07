@@ -44,29 +44,31 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
     @Override
     public Map<String, Object> execute(String schema, Map<String, Object> inputs) {
         long startTime = System.currentTimeMillis();
+        GaiaWorkflow workflow = null;
         try {
             // 使用GaiaWorkflow执行工作流
-            GaiaWorkflow workflow = createWorkflow(schema);
+            workflow = createWorkflow(schema);
             Map<String, Object> result = workflow.run(inputs);
 
             // 记录测试调用日志
-            recordTestCallLog(schema, inputs, result, startTime, null,workflow);
+            recordTestCallLog(schema, inputs, result, startTime, null, workflow);
 
             return result;
         } catch (Exception e) {
             logger.error("执行工作流失败", e);
             // 记录测试调用日志（包含错误信息）
-            recordTestCallLog(schema, inputs, null, startTime, e,null);
+            recordTestCallLog(schema, inputs, null, startTime, e, workflow);
             throw e;
         }
     }
 
     @Override
     public void processExecutionResult(TaskInfo taskInfo, String schema, Map<String, Object> inputs, Map<String, Object> outputs) {
+        GaiaWorkflow workflow = null;
         try {
             // 使用GaiaWorkflow获取执行报告
-            GaiaWorkflow workflow = createWorkflow(schema);
-            // 重新执行以获取报告
+            workflow = createWorkflow(schema);
+            // 执行工作流以获取报告
             workflow.run(inputs);
 
             // 处理节点执行报告
@@ -99,7 +101,7 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
      * @param outputs   输出结果
      * @param startTime 开始时间
      * @param exception 异常信息（如果有的话）
-     * @param workflow
+     * @param workflow  工作流实例
      */
     private void recordTestCallLog(String schema, Map<String, Object> inputs, Map<String, Object> outputs, long startTime, Exception exception, GaiaWorkflow workflow) {
         try {
@@ -114,7 +116,10 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
             // 准备日志字段
             String execParam = JSONUtil.toJsonStr(inputs);
             String execStatus = (exception == null) ? "SUCCESS" : "FAILED";
-            String reports = JSONUtil.toJsonStr(workflow.getNodeReports()); // 可以从工作流执行中获取更详细的报告
+            String reports = "";
+            if (workflow != null) {
+                reports = JSONUtil.toJsonStr(workflow.getNodeReports());
+            }
             String callResult = (outputs != null) ? JSONUtil.toJsonStr(outputs) : "";
             String errorMessage = (exception != null) ? exception.getMessage() : "";
 
@@ -275,7 +280,10 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
      * @return 执行时长
      */
     private long calculateDuration(GaiaWorkflow.NodeReport report) {
-        return report.getEndTime() - report.getStartTime();
+        if (report.getStartTime() != null && report.getEndTime() != null) {
+            return report.getEndTime() - report.getStartTime();
+        }
+        return 0L;
     }
 
     /**
