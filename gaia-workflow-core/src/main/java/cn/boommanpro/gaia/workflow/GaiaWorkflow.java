@@ -70,34 +70,75 @@ public class GaiaWorkflow {
         executeInfoMap.forEach((nodeId, info) -> {
             String status = info.getStatus() != null ? info.getStatus().name() : "UNKNOWN";
             
-            // 创建包含执行信息的 snapshots
+            // 计算执行时长
+            long timeCost = 0;
+            if (info.getStartTime() != null && info.getEndTime() != null) {
+                timeCost = info.getEndTime() - info.getStartTime();
+            }
+            
+            // 创建 snapshots 列表
             List<Object> snapshots = new ArrayList<>();
             
-            // 创建一个包含节点执行信息的快照对象
-            Map<String, Object> snapshot = new HashMap<>();
-            snapshot.put("id", nodeId);
-            snapshot.put("status", status);
-            snapshot.put("triggerTime", info.getTriggerTime());
-            snapshot.put("startTime", info.getStartTime());
-            snapshot.put("endTime", info.getEndTime());
-            snapshot.put("inputsResult", info.getInputsResult());
-            snapshot.put("executeResult", info.getExecuteResult());
-            snapshot.put("outputResult", info.getOutputResult());
-            snapshot.put("inwardEdges", info.getInwardEdges());
+            // 创建与 controller 中格式一致的 snapshot 对象
+            Map<String, Object> snapshotData = new HashMap<>();
+            snapshotData.put("id", nodeId);
+            snapshotData.put("nodeID", nodeId);
+            snapshotData.put("inputs", parseJsonStringToMap(info.getInputsResult()));
+            snapshotData.put("outputs", parseJsonStringToMap(info.getOutputResult()));
+            snapshotData.put("data", parseJsonStringToObject(info.getExecuteResult()));
+            snapshotData.put("branch", ""); // 暂时为空，根据需要可以填充
+            snapshotData.put("error", status.contains("FAILED") ? "执行失败" : "");
             
-            snapshots.add(snapshot);
+            snapshots.add(snapshotData);
             
             NodeReport report = new NodeReport(
                     nodeId,
                     status,
                     info.getStartTime(),
                     info.getEndTime(),
+                    timeCost,
                     snapshots
             );
             nodeReports.put(nodeId, report);
         });
 
         return nodeReports;
+    }
+
+    /**
+     * 将 JSON 字符串解析为 Map 对象
+     *
+     * @param jsonString JSON 字符串
+     * @return Map 对象
+     */
+    private Map<String, Object> parseJsonStringToMap(String jsonString) {
+        if (jsonString == null || jsonString.isEmpty()) {
+            return new HashMap<>();
+        }
+        try {
+            return JSONUtil.parseObj(jsonString);
+        } catch (Exception e) {
+            // 解析失败时返回空 Map
+            return new HashMap<>();
+        }
+    }
+
+    /**
+     * 将 JSON 字符串解析为 Object 对象
+     *
+     * @param jsonString JSON 字符串
+     * @return Object 对象
+     */
+    private Object parseJsonStringToObject(String jsonString) {
+        if (jsonString == null || jsonString.isEmpty()) {
+            return new HashMap<>();
+        }
+        try {
+            return JSONUtil.parse(jsonString);
+        } catch (Exception e) {
+            // 解析失败时返回空对象
+            return new HashMap<>();
+        }
     }
 
     /**
@@ -110,6 +151,7 @@ public class GaiaWorkflow {
         private String status;
         private Long startTime;
         private Long endTime;
+        private Long timeCost;
         private List<Object> snapshots = new ArrayList<>();
 
     }

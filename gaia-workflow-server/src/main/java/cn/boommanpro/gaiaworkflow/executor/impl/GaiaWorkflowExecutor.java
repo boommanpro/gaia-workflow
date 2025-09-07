@@ -230,24 +230,22 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
      * @param workflow 工作流
      */
     private void processNodeReports(TaskInfo taskInfo, GaiaWorkflow workflow) {
-        // 获取节点执行报告
+        // 直接使用 GaiaWorkflow 提供的报告格式，避免重复处理逻辑
         Map<String, GaiaWorkflow.NodeReport> nodeReports = workflow.getNodeReports();
         Map<String, NodeReport> taskNodeReports = new HashMap<>();
 
-        // 获取Chain对象以访问执行信息
-        Chain chain = workflow.toChain();
-        Map<String, ChainNodeExecuteInfo> executeInfoMap = chain.getExecuteInfoMap();
-
         // 转换GaiaWorkflow.NodeReport为NodeReport
         nodeReports.forEach((nodeId, report) -> {
-            NodeReport taskReport = createNodeReport(nodeId, report);
-
-            // 获取节点执行信息
-            ChainNodeExecuteInfo nodeInfo = executeInfoMap.get(nodeId);
-            if (nodeInfo != null) {
-                processNodeExecutionInfo(taskReport, nodeId, nodeInfo);
-            }
-
+            // 直接使用 GaiaWorkflow.NodeReport 中的 snapshots 数据
+            NodeReport taskReport = new NodeReport(
+                    report.getId(),
+                    convertNodeStatus(report.getStatus()),
+                    report.getStartTime(),
+                    report.getEndTime(),
+                    report.getTimeCost(),
+                    convertSnapshots(report.getSnapshots())
+            );
+            
             taskNodeReports.put(nodeId, taskReport);
         });
 
@@ -256,137 +254,49 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
     }
 
     /**
-     * 创建节点报告
+     * 转换 snapshots 格式
      *
-     * @param nodeId 节点ID
-     * @param report 原始报告
-     * @return 节点报告
+     * @param snapshots 原始 snapshots
+     * @return 转换后的 snapshots
      */
-    private NodeReport createNodeReport(String nodeId, GaiaWorkflow.NodeReport report) {
-        return new NodeReport(
-                nodeId,
-                convertNodeStatus(report.getStatus()),
-                report.getStartTime(),
-                report.getEndTime(),
-                calculateDuration(report),
-                new ArrayList<>()
-        );
-    }
-
-    /**
-     * 计算执行时长
-     *
-     * @param report 原始报告
-     * @return 执行时长
-     */
-    private long calculateDuration(GaiaWorkflow.NodeReport report) {
-        if (report.getStartTime() != null && report.getEndTime() != null) {
-            return report.getEndTime() - report.getStartTime();
+    private ArrayList<Snapshot> convertSnapshots(java.util.List<Object> snapshots) {
+        ArrayList<Snapshot> convertedSnapshots = new ArrayList<>();
+        
+        for (Object snapshotObj : snapshots) {
+            if (snapshotObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> snapshotMap = (Map<String, Object>) snapshotObj;
+                
+                Snapshot snapshot = new Snapshot();
+                snapshot.setId((String) snapshotMap.get("id"));
+                snapshot.setNodeID((String) snapshotMap.get("nodeID"));
+                
+                // 处理 inputs
+                Object inputs = snapshotMap.get("inputs");
+                if (inputs instanceof Map) {
+                    snapshot.setInputs((Map<String, Object>) inputs);
+                }
+                
+                // 处理 outputs
+                Object outputs = snapshotMap.get("outputs");
+                if (outputs instanceof Map) {
+                    snapshot.setOutputs((Map<String, Object>) outputs);
+                }
+                
+                // 处理 data
+                snapshot.setData(snapshotMap.get("data"));
+                
+                // 处理 branch
+                snapshot.setBranch((String) snapshotMap.get("branch"));
+                
+                // 处理 error
+                snapshot.setError((String) snapshotMap.get("error"));
+                
+                convertedSnapshots.add(snapshot);
+            }
         }
-        return 0L;
-    }
-
-    /**
-     * 处理节点执行信息
-     *
-     * @param taskReport 任务报告
-     * @param nodeId 节点ID
-     * @param nodeInfo 节点执行信息
-     */
-    private void processNodeExecutionInfo(NodeReport taskReport, String nodeId, ChainNodeExecuteInfo nodeInfo) {
-        try {
-            Snapshot snapshot = createSnapshot(nodeId);
-
-            processNodeInputs(snapshot, nodeInfo);
-            processNodeOutputs(snapshot, nodeInfo);
-            processNodeExecuteResult(snapshot, nodeInfo);
-            processNodeStatus(snapshot, nodeInfo);
-
-            taskReport.getSnapshots().add(snapshot);
-        } catch (Exception e) {
-            logger.error("处理节点执行信息失败", e);
-            taskReport.getSnapshots().add(createErrorSnapshot(nodeId, e));
-        }
-    }
-
-    /**
-     * 创建快照
-     *
-     * @param nodeId 节点ID
-     * @return 快照
-     */
-    private Snapshot createSnapshot(String nodeId) {
-        Snapshot snapshot = new Snapshot();
-        snapshot.setId(nodeId);
-        snapshot.setNodeID(nodeId);
-        return snapshot;
-    }
-
-    /**
-     * 创建错误快照
-     *
-     * @param nodeId 节点ID
-     * @param e 异常
-     * @return 错误快照
-     */
-    private Snapshot createErrorSnapshot(String nodeId, Exception e) {
-        Snapshot errorSnapshot = new Snapshot();
-        errorSnapshot.setId(UUID.randomUUID().toString());
-        errorSnapshot.setNodeID(nodeId);
-        errorSnapshot.setError("解析节点执行信息失败: " + e.getMessage());
-        return errorSnapshot;
-    }
-
-    /**
-     * 处理节点输入
-     *
-     * @param snapshot 快照
-     * @param nodeInfo 节点执行信息
-     */
-    private void processNodeInputs(Snapshot snapshot, ChainNodeExecuteInfo nodeInfo) {
-        if (nodeInfo.getInputsResult() != null) {
-            Map<String, Object> inputsMap = new HashMap<>();
-            inputsMap.putAll(JSONUtil.parseObj(nodeInfo.getInputsResult()));
-            snapshot.setInputs(inputsMap);
-        }
-    }
-
-    /**
-     * 处理节点输出
-     *
-     * @param snapshot 快照
-     * @param nodeInfo 节点执行信息
-     */
-    private void processNodeOutputs(Snapshot snapshot, ChainNodeExecuteInfo nodeInfo) {
-        if (nodeInfo.getOutputResult() != null) {
-            Map<String, Object> outputsMap = new HashMap<>();
-            outputsMap.putAll(JSONUtil.parseObj(nodeInfo.getOutputResult()));
-            snapshot.setOutputs(outputsMap);
-        }
-    }
-
-    /**
-     * 处理节点执行结果
-     *
-     * @param snapshot 快照
-     * @param nodeInfo 节点执行信息
-     */
-    private void processNodeExecuteResult(Snapshot snapshot, ChainNodeExecuteInfo nodeInfo) {
-        if (nodeInfo.getExecuteResult() != null) {
-            snapshot.setData(JSONUtil.parseObj(nodeInfo.getExecuteResult()));
-        }
-    }
-
-    /**
-     * 处理节点状态
-     *
-     * @param snapshot 快照
-     * @param nodeInfo 节点执行信息
-     */
-    private void processNodeStatus(Snapshot snapshot, ChainNodeExecuteInfo nodeInfo) {
-        if (nodeInfo.getStatus() != null && nodeInfo.getStatus().name().contains("ERROR")) {
-            snapshot.setError("执行出错: " + nodeInfo.getStatus().name());
-        }
+        
+        return convertedSnapshots;
     }
 
     /**
