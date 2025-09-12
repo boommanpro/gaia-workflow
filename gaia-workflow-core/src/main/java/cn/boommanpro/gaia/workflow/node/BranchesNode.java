@@ -2,6 +2,8 @@ package cn.boommanpro.gaia.workflow.node;
 
 import cn.boommanpro.gaia.workflow.model.Chain;
 import cn.boommanpro.gaia.workflow.param.Parameter;
+import cn.boommanpro.gaia.workflow.node.condition.ConditionOperator;
+import cn.boommanpro.gaia.workflow.node.condition.ConditionOperatorFactory;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +50,7 @@ public class BranchesNode extends BaseNode {
     /**
      * 评估一个分支的条件是否满足
      */
-    private boolean evaluateBranch(Branch branch, Chain chain) {
+    protected boolean evaluateBranch(Branch branch, Chain chain) {
         List<Condition> conditions = branch.getConditions();
         String logic = branch.getLogic();
 
@@ -92,25 +94,38 @@ public class BranchesNode extends BaseNode {
             return false;
         }
 
+        // 使用策略模式处理操作符
+        ConditionOperator<Object> operatorHandler = ConditionOperatorFactory.getOperator(operator);
+        if (operatorHandler == null) {
+            log.warn("不支持的操作符: {}", operator);
+            return false;
+        }
+
         Object leftValue = getExpressionValue(expression.getLeft(), chain);
 
         switch (operator) {
             case "is_empty":
-                return leftValue == null || leftValue.toString().isEmpty();
+            case "is_not_empty":
             case "is_true":
-                return Boolean.TRUE.equals(leftValue);
-            case "eq":
+            case "is_false":
+            case "contains":
+            case "not_contains":
+                // 这些操作符只需要左值或只需要比较左值与右值
                 Object rightValue = getExpressionValue(expression.getRight(), chain);
-                if (leftValue == null && rightValue == null) {
-                    return true;
-                }
-                if (leftValue == null || rightValue == null) {
-                    return false;
-                }
-                return leftValue.equals(rightValue);
-            // 可以根据需要添加更多的操作符
+                return operatorHandler.apply(leftValue, rightValue);
+            case "eq":
+            case "neq":
+            case "gt":
+            case "gte":
+            case "lt":
+            case "lte":
+                // 这些操作符需要左右两个值
+                rightValue = getExpressionValue(expression.getRight(), chain);
+                return operatorHandler.apply(leftValue, rightValue);
             default:
-                return false;
+                // 默认情况
+                rightValue = getExpressionValue(expression.getRight(), chain);
+                return operatorHandler.apply(leftValue, rightValue);
         }
     }
 
@@ -126,10 +141,14 @@ public class BranchesNode extends BaseNode {
 
         if ("ref".equals(type)) {
             // 引用类型，从chain的memory中获取值
-            List<String> content = (List<String>) part.getContent();
-            if (content != null && content.size() >= 2) {
-                String key = String.join(".", content);
+            Object content = part.getContent();
+            if (content instanceof List) {
+                List<String> contentList = (List<String>) content;
+                String key = String.join(".", contentList);
                 return chain.getMemory().get(key);
+            } else if (content instanceof String) {
+                // 如果content是字符串，直接使用它作为key
+                return chain.getMemory().get((String) content);
             }
         } else if ("constant".equals(type)) {
             // 常量类型，直接返回值
@@ -182,7 +201,14 @@ public class BranchesNode extends BaseNode {
 
     @Override
     public List<Parameter> getOutputParameters() {
-        return  new ArrayList<>();
-
+        List<Parameter> parameters = new ArrayList<>();
+        for (Branch branch : branches) {
+            Parameter parameter = new Parameter();
+            parameter.setName(branch.getId());
+            parameter.setType(cn.boommanpro.gaia.workflow.param.DataType.Boolean);
+            parameter.setDescription(branch.getTitle());
+            parameters.add(parameter);
+        }
+        return parameters;
     }
 }
