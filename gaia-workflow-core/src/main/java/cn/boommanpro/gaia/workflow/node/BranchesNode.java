@@ -4,14 +4,12 @@ import cn.boommanpro.gaia.workflow.model.Chain;
 import cn.boommanpro.gaia.workflow.param.Parameter;
 import cn.boommanpro.gaia.workflow.node.condition.ConditionOperator;
 import cn.boommanpro.gaia.workflow.node.condition.ConditionOperatorFactory;
+import cn.boommanpro.gaia.workflow.param.RefType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 分支节点，用于处理工作流中的条件分支
@@ -27,6 +25,9 @@ public class BranchesNode extends BaseNode {
     // 分支列表
     private List<Branch> branches = new ArrayList<>();
 
+    private static final String ELSE_BRANCH_ID = "else";
+
+
     @Override
     public Map<String, Object> execute(Chain chain) {
         // 执行所有分支的条件判断，并将结果存入memory
@@ -35,10 +36,11 @@ public class BranchesNode extends BaseNode {
         for (Branch branch : branches) {
             boolean branchResult = evaluateBranch(branch, chain);
             result.put(branch.getId(), branchResult);
-            // 将结果存入chain的memory中，以便后续节点使用
-            chain.getMemory().put(getId() + "." + branch.getId(), branchResult);
+            if (branchResult) {
+                return result;
+            }
         }
-
+        result.put(ELSE_BRANCH_ID, true);
         return result;
     }
 
@@ -207,8 +209,17 @@ public class BranchesNode extends BaseNode {
             parameter.setName(branch.getId());
             parameter.setType(cn.boommanpro.gaia.workflow.param.DataType.Boolean);
             parameter.setDescription(branch.getTitle());
+            parameter.setRefType(RefType.REF);
+            parameter.setRefValue(Collections.singletonList(branch.getId()));
             parameters.add(parameter);
         }
+        Parameter parameter = new Parameter();
+        parameter.setName(ELSE_BRANCH_ID);
+        parameter.setType(cn.boommanpro.gaia.workflow.param.DataType.Boolean);
+        parameter.setDescription(ELSE_BRANCH_ID);
+        parameter.setRefType(RefType.REF);
+        parameter.setRefValue(Collections.singletonList(ELSE_BRANCH_ID));
+        parameters.add(parameter);
         return parameters;
     }
 }
