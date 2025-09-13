@@ -15,7 +15,8 @@ public enum NodeTypeEnum {
     COMMENT("comment", "评论节点"),
     BRANCHES("branches", "分支节点"),
     STRING_FORMAT("string-format", "字符串格式化节点"),
-    VARIABLE("variable", "变量节点");
+    VARIABLE("variable", "变量节点"),
+    HTTP("http", "HTTP请求节点");
     ;
 
     private final String code;

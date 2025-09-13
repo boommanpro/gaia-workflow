@@ -35,6 +35,7 @@ public class ChainParser {
         nodeParserMap.put(NodeTypeEnum.BRANCHES.getCode(), new BranchesNodeParser());
         nodeParserMap.put(NodeTypeEnum.STRING_FORMAT.getCode(), new StringFormatCodeParser());
         nodeParserMap.put(NodeTypeEnum.VARIABLE.getCode(), new VariableNodeParser());
+        nodeParserMap.put(NodeTypeEnum.HTTP.getCode(), new HttpNodeParser());
     }
 
     public Chain parse(JSONArray nodes, JSONArray edges, GaiaWorkflow workflow) {
