@@ -5,6 +5,9 @@ import cn.boommanpro.gaia.workflow.param.Parameter;
 import cn.boommanpro.gaia.workflow.node.condition.ConditionOperator;
 import cn.boommanpro.gaia.workflow.node.condition.ConditionOperatorFactory;
 import cn.boommanpro.gaia.workflow.param.RefType;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONArray;
+import cn.hutool.json.JSONUtil;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
@@ -154,7 +157,21 @@ public class BranchesNode extends BaseNode {
             }
         } else if ("constant".equals(type)) {
             // 常量类型，直接返回值
-            return part.getContent();
+            Object content = part.getContent();
+            // 如果是字符串且看起来像JSON数组，则尝试解析为List
+            if (content instanceof String) {
+                String contentStr = (String) content;
+                if (contentStr.startsWith("[") && contentStr.endsWith("]")) {
+                    try {
+                        JSONArray array = JSONUtil.parseArray(contentStr);
+                        return array.toList(Object.class);
+                    } catch (Exception e) {
+                        // 解析失败则返回原始字符串
+                        log.warn("Failed to parse constant array string: {}", contentStr, e);
+                    }
+                }
+            }
+            return content;
         }
 
         return null;
