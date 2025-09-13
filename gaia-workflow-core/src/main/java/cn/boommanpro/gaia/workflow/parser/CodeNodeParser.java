@@ -37,7 +37,7 @@ public class CodeNodeParser extends BaseNodeParser<CodeNode> {
         String scriptLanguage = nodeJSONObject.getByPath(SCRIPT_LANGUAGE_PATH, String.class);
 
         CodeNode codeNode;
-        if (scriptLanguage == null || "javascript".equalsIgnoreCase(scriptLanguage)) {
+        if (scriptLanguage == null || "jsReturn".equalsIgnoreCase(scriptLanguage)) {
             // 默认或JS语言使用原来的JsFunExecNode
             codeNode = new JsFunExecNode(scriptContent);
         } else {
