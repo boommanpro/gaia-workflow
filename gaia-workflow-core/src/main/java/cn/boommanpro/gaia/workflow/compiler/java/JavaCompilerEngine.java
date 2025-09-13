@@ -9,22 +9,43 @@ import cn.boommanpro.gaia.workflow.compiler.java.dependency.MemoryClassLoader;
 import cn.boommanpro.gaia.workflow.compiler.pojo.CompileResult;
 import cn.boommanpro.gaia.workflow.compiler.pojo.CompilerCache;
 import cn.boommanpro.gaia.workflow.compiler.pojo.JavaCompilerResult;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 
 import java.util.Base64;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 public class JavaCompilerEngine implements CompilerEngine {
 
     private static final JavaCompiler javaCompiler = new JavaCompiler();
 
     public static final MemoryClassLoader defaultClassLoader = new MemoryClassLoader();
+    
+    // 添加缓存，使用LoadingCache自动处理缓存加载和过期
+    private static final LoadingCache<String, CompileResult> scriptCache = CacheBuilder.newBuilder()
+            .maximumSize(1000) // 最多缓存1000个脚本
+            .expireAfterWrite(1, TimeUnit.HOURS) // 缓存1小时后过期
+            .build(new CacheLoader<String, CompileResult>() {
+                @Override
+                public CompileResult load(String script) throws Exception {
+                    try {
+                        JavaCompilerResult compile = javaCompiler.compile(script, defaultClassLoader);
+                        return CompileResult.success(compile.getMainClass(), compile.getClassList());
+                    } catch (Exception e) {
+                        return CompileResult.otherException(e);
+                    }
+                }
+            });
 
     @Override
     public CompileResult loadClass(String script) {
         try {
-            JavaCompilerResult compile = javaCompiler.compile(script, defaultClassLoader);
-            return CompileResult.success(compile.getMainClass(), compile.getClassList());
-        } catch (Exception e) {
+            return scriptCache.get(script);
+        } catch (ExecutionException e) {
+            // 如果缓存加载过程中出现异常，返回异常结果
             return CompileResult.otherException(e);
         }
     }

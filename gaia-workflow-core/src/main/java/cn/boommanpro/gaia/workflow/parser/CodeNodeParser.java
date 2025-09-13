@@ -2,6 +2,7 @@ package cn.boommanpro.gaia.workflow.parser;
 
 import cn.boommanpro.gaia.workflow.GaiaWorkflow;
 import cn.boommanpro.gaia.workflow.node.CodeNode;
+import cn.boommanpro.gaia.workflow.node.DynamicCompileNode;
 import cn.boommanpro.gaia.workflow.node.JsFunExecNode;
 import cn.boommanpro.gaia.workflow.param.DataType;
 import cn.boommanpro.gaia.workflow.param.Parameter;
@@ -31,10 +32,18 @@ public class CodeNodeParser extends BaseNodeParser<CodeNode> {
     private static final String SCRIPT_LANGUAGE_PATH = "$.data.script.language";
 
     @Override
-    public JsFunExecNode buildInstance(JSONObject nodeJSONObject, GaiaWorkflow workflow) {
+    public CodeNode buildInstance(JSONObject nodeJSONObject, GaiaWorkflow workflow) {
         String scriptContent = nodeJSONObject.getByPath(SCRIPT_CONTENT_PATH).toString();
+        String scriptLanguage = nodeJSONObject.getByPath(SCRIPT_LANGUAGE_PATH, String.class);
 
-        JsFunExecNode codeNode = new JsFunExecNode(scriptContent);
+        CodeNode codeNode;
+        if (scriptLanguage == null || "javascript".equalsIgnoreCase(scriptLanguage)) {
+            // 默认或JS语言使用原来的JsFunExecNode
+            codeNode = new JsFunExecNode(scriptContent);
+        } else {
+            // 其他语言使用新的DynamicCompileNode
+            codeNode = new DynamicCompileNode(scriptContent, scriptLanguage);
+        }
 
         JSONObject inputsSchema = (JSONObject) nodeJSONObject.getByPath(INPUTS_JSON_PATH);
         JSONObject inputsValues = (JSONObject) nodeJSONObject.getByPath(INPUTS_VALUES_JSON_PATH);
