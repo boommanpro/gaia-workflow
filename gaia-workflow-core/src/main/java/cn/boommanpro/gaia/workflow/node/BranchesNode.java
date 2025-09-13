@@ -5,6 +5,7 @@ import cn.boommanpro.gaia.workflow.param.Parameter;
 import cn.boommanpro.gaia.workflow.node.condition.ConditionOperator;
 import cn.boommanpro.gaia.workflow.node.condition.ConditionOperatorFactory;
 import cn.boommanpro.gaia.workflow.param.RefType;
+import cn.boommanpro.gaia.workflow.tools.SpringExpressionParser;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONUtil;
@@ -150,10 +151,10 @@ public class BranchesNode extends BaseNode {
             if (content instanceof List) {
                 List<String> contentList = (List<String>) content;
                 String key = String.join(".", contentList);
-                return chain.getMemory().get(key);
+                return SpringExpressionParser.getInstance().getValue(key,chain.getMemory());
             } else if (content instanceof String) {
                 // 如果content是字符串，直接使用它作为key
-                return chain.getMemory().get((String) content);
+                 return SpringExpressionParser.getInstance().getValue((String) content,chain.getMemory());
             }
         } else if ("constant".equals(type)) {
             // 常量类型，直接返回值

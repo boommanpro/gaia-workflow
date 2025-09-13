@@ -3,6 +3,7 @@ package cn.boommanpro.gaia.workflow.node;
 import cn.boommanpro.gaia.workflow.model.Chain;
 import cn.boommanpro.gaia.workflow.param.Parameter;
 import cn.boommanpro.gaia.workflow.param.RefType;
+import cn.boommanpro.gaia.workflow.tools.SpringExpressionParser;
 import cn.hutool.json.JSONObject;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -63,10 +64,15 @@ public class VariableNode extends BaseNode {
         if (refPath.size() < 2) {
             return;
         }
-        String path = String.join(".", refPath);
         // 获取右值
         Object value = evaluateValue(assign.getRight(), chain);
-        chain.getMemory().put(path, value);
+        Map<String, Object> target = chain.getMemory();
+        for (int i = 0; i < refPath.size()-1; i++) {
+            target = (Map<String, Object>) target.get(refPath.get(i));
+        }
+        if (target != null) {
+            target.put(refPath.get(refPath.size() - 1), value);
+        }
     }
 
     /**
@@ -85,7 +91,7 @@ public class VariableNode extends BaseNode {
                 if (refPath != null && refPath.size() >= 2) {
                     String nodeId = refPath.get(0).toString();
                     String paramName = refPath.get(1).toString();
-                    Object nodeResult = chain.getMemory().get(nodeId);
+                    Object nodeResult = SpringExpressionParser.getInstance().getValue(nodeId,chain.getMemory());;
                     if (nodeResult instanceof Map) {
                         return ((Map<?, ?>) nodeResult).get(paramName);
                     }
