@@ -10,7 +10,6 @@ import cn.boommanpro.gaia.workflow.status.ChainDepStatus;
 import cn.boommanpro.gaia.workflow.status.ChainEdgeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainStatus;
-import cn.boommanpro.gaia.workflow.tools.SpringExpressionParser;
 import cn.boommanpro.gaia.workflow.util.NamedThreadPools;
 import cn.hutool.core.text.StrFormatter;
 import cn.hutool.json.JSONUtil;
@@ -188,8 +187,7 @@ public class Chain extends ChainNode {
                         value = nodeResultMap.get(refValue.get(1));
                     }
                 } else {
-                    String key = String.format("#%s",String.join(".", parameter.getRefValue()));
-                    value = SpringExpressionParser.getInstance().getValue(key,execute);
+                    value = execute.getOrDefault(String.join(".", parameter.getRefValue()), parameter.getDefaultValue());
                 }
             } else {
                 value = parameter.getDefaultValue();

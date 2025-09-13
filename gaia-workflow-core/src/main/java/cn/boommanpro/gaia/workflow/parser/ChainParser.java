@@ -119,8 +119,8 @@ public class ChainParser {
             edge.setCondition(new EdgeCondition() {
                 @Override
                 public boolean check(Chain chain, ChainEdge edge) {
-                    String key = String.format("#%s.%s",edgeObject.getStr("sourceNodeID"), edgeObject.getStr("sourcePortID"));
-                    Object o = SpringExpressionParser.getInstance().getValue(key);
+                    String key = String.format("%s.%s",edgeObject.getStr("sourceNodeID"), edgeObject.getStr("sourcePortID"));
+                    Object o = SpringExpressionParser.getInstance().getValue(key,chain.getMemory());
                     return Optional.ofNullable(o).map(new Function<Object, Boolean>() {
                         @Override
                         public Boolean apply(Object o) {
