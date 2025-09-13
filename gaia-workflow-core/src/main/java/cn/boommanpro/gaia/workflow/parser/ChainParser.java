@@ -6,6 +6,7 @@ import cn.boommanpro.gaia.workflow.model.Chain;
 import cn.boommanpro.gaia.workflow.model.ChainEdge;
 import cn.boommanpro.gaia.workflow.model.ChainNode;
 import cn.boommanpro.gaia.workflow.node.NodeTypeEnum;
+import cn.boommanpro.gaia.workflow.tools.SpringExpressionParser;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
@@ -118,7 +119,8 @@ public class ChainParser {
             edge.setCondition(new EdgeCondition() {
                 @Override
                 public boolean check(Chain chain, ChainEdge edge) {
-                    Object o = chain.getMemory().get(String.format(edgeObject.getStr("sourceNodeID") + "." + edgeObject.getStr("sourcePortID")));
+                    String key = String.format("#%s.%s",edgeObject.getStr("sourceNodeID"), edgeObject.getStr("sourcePortID"));
+                    Object o = SpringExpressionParser.getInstance().getValue(key);
                     return Optional.ofNullable(o).map(new Function<Object, Boolean>() {
                         @Override
                         public Boolean apply(Object o) {

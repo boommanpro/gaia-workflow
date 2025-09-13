@@ -10,6 +10,7 @@ import cn.boommanpro.gaia.workflow.status.ChainDepStatus;
 import cn.boommanpro.gaia.workflow.status.ChainEdgeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainStatus;
+import cn.boommanpro.gaia.workflow.tools.SpringExpressionParser;
 import cn.boommanpro.gaia.workflow.util.NamedThreadPools;
 import cn.hutool.core.text.StrFormatter;
 import cn.hutool.json.JSONUtil;
@@ -131,12 +132,7 @@ public class Chain extends ChainNode {
                     Map<String, Object> outputResult = parseOutputResult(outputParameters, execute);
                     chainNodeExecuteInfo.setOutputResult(JSONUtil.toJsonStr(outputResult));
                     if (!outputResult.isEmpty()) {
-                        outputResult.entrySet().forEach(new Consumer<Map.Entry<String, Object>>() {
-                            @Override
-                            public void accept(Map.Entry<String, Object> entry) {
-                                getMemory().put(chainNode.getId() + "." + entry.getKey(), entry.getValue());
-                            }
-                        });
+                        getMemory().put(chainNode.getId(), new HashMap<>(outputResult));
                     }
                     chainNode.setStatus(ChainNodeStatus.FINISHED);
                     this.executeResult = execute;
@@ -184,7 +180,17 @@ public class Chain extends ChainNode {
         for (Parameter parameter : outputParameters) {
             Object value = null;
             if (parameter.getRefType() == RefType.REF) {
-                value = execute.getOrDefault(String.join(".", parameter.getRefValue()), parameter.getDefaultValue());
+                List<String> refValue = parameter.getRefValue();
+                if (refValue.size() >= 2) {
+                    Object nodeResult = execute.get(refValue.get(0));
+                    if (nodeResult instanceof Map) {
+                        Map<String, Object> nodeResultMap = (Map<String, Object>) nodeResult;
+                        value = nodeResultMap.get(refValue.get(1));
+                    }
+                } else {
+                    String key = String.format("#%s",String.join(".", parameter.getRefValue()));
+                    value = SpringExpressionParser.getInstance().getValue(key,execute);
+                }
             } else {
                 value = parameter.getDefaultValue();
             }
@@ -241,7 +247,14 @@ public class Chain extends ChainNode {
         for (Parameter parameter : parameters) {
             Object value = null;
             if (parameter.getRefType()== RefType.REF) {
-                value = getMemory().get(String.join(".", parameter.getRefValue()) );
+                List<String> refValue = parameter.getRefValue();
+                if (refValue.size() >= 2) {
+                    Object nodeResult = getMemory().get(refValue.get(0));
+                    if (nodeResult instanceof Map) {
+                        Map<String, Object> nodeResultMap = (Map<String, Object>) nodeResult;
+                        value = nodeResultMap.get(refValue.get(1));
+                    }
+                }
             }else {
                 value = parameter.getDefaultValue();
             }
