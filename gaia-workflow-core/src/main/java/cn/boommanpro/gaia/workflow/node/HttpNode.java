@@ -13,10 +13,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * HTTP请求节点，用于发起HTTP请求
@@ -237,16 +234,22 @@ public class HttpNode extends BaseNode {
 
         Parameter bodyParam = new Parameter();
         bodyParam.setName("body");
+        bodyParam.setRefValue(Arrays.asList("body"));
+        bodyParam.setRefType(RefType.REF);
         bodyParam.setType(cn.boommanpro.gaia.workflow.param.DataType.String);
         parameters.add(bodyParam);
 
         Parameter headersParam = new Parameter();
         headersParam.setName("headers");
+        headersParam.setRefValue(Arrays.asList("headers"));
+        headersParam.setRefType(RefType.REF);
         headersParam.setType(cn.boommanpro.gaia.workflow.param.DataType.Object);
         parameters.add(headersParam);
 
         Parameter statusCodeParam = new Parameter();
         statusCodeParam.setName("statusCode");
+        statusCodeParam.setRefValue(Arrays.asList("statusCode"));
+        statusCodeParam.setRefType(RefType.REF);
         statusCodeParam.setType(cn.boommanpro.gaia.workflow.param.DataType.Integer);
         parameters.add(statusCodeParam);
 
