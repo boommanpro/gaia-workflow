@@ -17,8 +17,9 @@ public class ChainNodeExecuteInfo {
     private Long startTime;
     private Long endTime;
     private String inputsResult;
-    private String  executeResult;
+    private String executeResult;
     private String outputResult;
+    private String exception; // 添加异常信息字段
     private List<String> inwardEdges=new ArrayList<>();
 
     public void trigger() {

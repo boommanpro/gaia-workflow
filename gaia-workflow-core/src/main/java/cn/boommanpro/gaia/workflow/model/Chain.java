@@ -11,11 +11,14 @@ import cn.boommanpro.gaia.workflow.status.ChainEdgeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainStatus;
 import cn.boommanpro.gaia.workflow.util.NamedThreadPools;
+import cn.hutool.core.exceptions.ExceptionUtil;
 import cn.hutool.core.text.StrFormatter;
 import cn.hutool.json.JSONUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -141,6 +144,7 @@ public class Chain extends ChainNode {
                     log.error("exec {} node {}, error:", chainNode.getNodeType(), chainNode.getId(), e);
                     chainNodeExecuteInfo.setStatus(ChainNodeStatus.FAILED);
                     chainNodeExecuteInfo.setExecuteResult(StrFormatter.format("exec {} node {}, error:", chainNode.getNodeType(), chainNode.getId(), e.getMessage()));
+                    chainNodeExecuteInfo.setException(ExceptionUtil.stacktraceToString(e)); // 保存异常堆栈信息
                     this.chainStatus= ChainStatus.FINISHED_ABNORMAL;
                 }
 

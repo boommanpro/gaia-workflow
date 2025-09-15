@@ -53,7 +53,6 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
             // 记录测试调用日志
             recordTestCallLog(schema, inputs, result, startTime, null, workflow);
 
-
             return result;
         } catch (Exception e) {
             logger.error("执行工作流失败", e);

@@ -87,7 +87,17 @@ public class GaiaWorkflow {
             snapshotData.put("outputs", parseJsonStringToMap(info.getOutputResult()));
             snapshotData.put("data", parseJsonStringToObject(info.getExecuteResult()));
             snapshotData.put("branch", ""); // 暂时为空，根据需要可以填充
-            snapshotData.put("error", status.contains("FAILED") ? "执行失败" : "");
+            
+            // 在error字段中包含异常信息
+            String error = "";
+            if (status.contains("FAILED")) {
+                if (info.getException() != null && !info.getException().isEmpty()) {
+                    error = info.getException();
+                } else {
+                    error = "执行失败";
+                }
+            }
+            snapshotData.put("error", error);
             
             snapshots.add(snapshotData);
             

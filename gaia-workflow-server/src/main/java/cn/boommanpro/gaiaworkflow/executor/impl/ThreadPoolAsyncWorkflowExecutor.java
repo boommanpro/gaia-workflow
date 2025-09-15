@@ -94,24 +94,50 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
                 // 更新工作流状态为处理中
                 updateTaskStatus(taskId, taskInfo, NodeStatus.PROCESSING);
 
-                // 直接执行工作流并获取结果，避免重复执行
+                // 直接执行工作流并获取结果
                 long startTime = System.currentTimeMillis();
                 GaiaWorkflow workflow = new GaiaWorkflow(input.getSchema());
-                Map<String, Object> outputs = workflow.run(input.getInputs());
+                
+                Map<String, Object> outputs;
+                Exception workflowException = null;
+                
+                try {
+                    outputs = workflow.run(input.getInputs());
+                } catch (Exception e) {
+                    // 捕获工作流执行异常，但不立即抛出
+                    workflowException = e;
+                    outputs = new HashMap<>(); // 空的输出结果
+                }
+                
                 long costTime = System.currentTimeMillis() - startTime;
 
                 // 处理节点执行报告
                 processNodeReports(taskId, taskInfo, workflow);
 
-                // 设置执行成功状态
-                taskInfo.getWorkflowStatus().setStatus(NodeStatus.SUCCESS.getValue());
+                // 根据是否有异常设置工作流状态
+                if (workflowException == null) {
+                    // 没有异常，设置为成功状态
+                    taskInfo.getWorkflowStatus().setStatus(NodeStatus.SUCCESS.getValue());
+                } else {
+                    // 有异常，设置为失败状态
+                    taskInfo.getWorkflowStatus().setStatus(NodeStatus.FAIL.getValue());
+                    
+                    // 记录错误信息
+                    Messages messages = taskInfo.getMessages();
+                    if (messages == null) {
+                        messages = new Messages();
+                        taskInfo.setMessages(messages);
+                    }
+                    messages.getError().add(new ErrorMessage("workflow", workflowException.getMessage()));
+                }
+                
                 taskInfo.getWorkflowStatus().setTerminated(true);
 
                 // 设置输出结果
                 taskInfo.setOutputs(outputs);
 
                 // 记录测试调用日志
-                recordTestCallLog(taskId, taskInfo, input, outputs, costTime, null);
+                recordTestCallLog(taskId, taskInfo, input, outputs, costTime, workflowException);
 
                 // 更新任务信息
                 taskRepository.updateTask(taskId, taskInfo);
@@ -155,6 +181,11 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
             taskInfo.setNodeReports(taskNodeReports);
         } catch (Exception e) {
             logger.error("处理节点报告失败, taskId: {}", taskId, e);
+            
+            // 即使处理报告失败，也要确保任务信息被正确设置
+            if (taskInfo.getNodeReports() == null) {
+                taskInfo.setNodeReports(new HashMap<>());
+            }
         }
     }
 
@@ -217,6 +248,7 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
 
         switch (status.toUpperCase()) {
             case "READY":
+                return NodeStatus.PENDING.getValue();
             case "WAIT":
                 return NodeStatus.PENDING.getValue();
             case "RUNNING":
