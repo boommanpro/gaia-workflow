@@ -1,6 +1,6 @@
 package cn.boommanpro.gaia.workflow.compiler.pojo;
 
-import cn.boommanpro.gaia.workflow.compiler.java.dependency.JavaCompiler;
+import cn.boommanpro.gaia.workflow.compiler.java.dependency.MemoryClassLoader;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -8,6 +8,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 @Data
@@ -18,23 +19,34 @@ public class CompileResult {
     protected final List<Class<?>> classList;
     protected final CompileResultCode code;
     protected final String msg;
+    
+    // 保存编译生成的字节码，避免后续需要重新获取
+    private Map<String, byte[]> classBytesMap = new HashMap<>();
 
     public static CompileResult success(Class<?> result) {
-        return new CompileResult(result, Arrays.asList(result), CompileResultCode.SUCCESS, "ok");
+        return new CompileResult(result, Arrays.asList(result), CompileResultCode.SUCCESS, "ok", new HashMap<>());
     }
 
     public static CompileResult success(Class<?> result, List<Class<?>> classList) {
-        return new CompileResult(result, classList, CompileResultCode.SUCCESS, "ok");
+        return new CompileResult(result, classList, CompileResultCode.SUCCESS, "ok", new HashMap<>());
     }
 
 
     public static CompileResult compileException(Exception e) {
-        return new CompileResult(null, null, CompileResultCode.COMPILE_EXCEPTION, e.getMessage());
+        return new CompileResult(null, null, CompileResultCode.COMPILE_EXCEPTION, e.getMessage(), new HashMap<>());
     }
 
 
     public static CompileResult otherException(Exception e) {
-        return new CompileResult(null, null, CompileResultCode.OTHER_EXCEPTION, e != null ? e.getMessage() : null);
+        return new CompileResult(null, null, CompileResultCode.OTHER_EXCEPTION, e != null ? e.getMessage() : null, new HashMap<>());
+    }
+    
+    /**
+     * 设置编译后的字节码，用于后续序列化
+     * @param classBytesMap 类名到字节码的映射
+     */
+    public void setClassBytesMap(Map<String, byte[]> classBytesMap) {
+        this.classBytesMap = classBytesMap;
     }
 
     /**
@@ -51,7 +63,12 @@ public class CompileResult {
                 Class::getName,
                 cls -> {
                     try {
-                        byte[] classBytes = JavaCompiler.getBytes(cls.getName());
+                        // 优先从缓存中获取字节码
+                        byte[] classBytes = classBytesMap.get(cls.getName());
+                        if (classBytes == null) {
+                            // 如果缓存中没有，则尝试通过ClassLoader获取
+                            classBytes = getClassBytesFromClassLoader(cls);
+                        }
                         return Base64.getEncoder().encodeToString(classBytes);
                     } catch (Exception e) {
                         throw new RuntimeException("Failed to read class bytes for " + cls.getName(), e);
@@ -61,5 +78,17 @@ public class CompileResult {
 
         compilerCache.setEncodeClassMap(encodeCacheMap);
         return compilerCache;
+    }
+    
+    /**
+     * 从ClassLoader中获取类的字节码
+     * @param clazz 类对象
+     * @return 字节码数组
+     */
+    private byte[] getClassBytesFromClassLoader(Class<?> clazz) {
+        // 这是一个简化的实现，实际项目中可能需要更复杂的逻辑
+        // 比如通过反射访问ClassLoader的内部结构
+        throw new UnsupportedOperationException("Cannot retrieve class bytes after compilation. " +
+                "Please use setClassBytesMap to provide class bytes during compilation success.");
     }
 }

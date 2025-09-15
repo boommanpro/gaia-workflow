@@ -22,8 +22,7 @@ public class JavaCompilerEngine implements CompilerEngine {
 
     private static final JavaCompiler javaCompiler = new JavaCompiler();
 
-    public static final MemoryClassLoader defaultClassLoader = new MemoryClassLoader();
-    
+
     // 添加缓存，使用LoadingCache自动处理缓存加载和过期
     private static final LoadingCache<String, CompileResult> scriptCache = CacheBuilder.newBuilder()
             .maximumSize(1000) // 最多缓存1000个脚本
@@ -32,10 +31,12 @@ public class JavaCompilerEngine implements CompilerEngine {
                 @Override
                 public CompileResult load(String script) throws Exception {
                     try {
-                        JavaCompilerResult compile = javaCompiler.compile(script, defaultClassLoader);
+                        JavaCompilerResult compile = javaCompiler.compile(script, new MemoryClassLoader());
                         return CompileResult.success(compile.getMainClass(), compile.getClassList());
                     } catch (Exception e) {
                         return CompileResult.otherException(e);
+                    }finally {
+
                     }
                 }
             });
@@ -60,15 +61,18 @@ public class JavaCompilerEngine implements CompilerEngine {
             throw new CompileException("No classes found in cache");
         }
 
+        // 为每次加载创建新的ClassLoader避免状态污染
+        MemoryClassLoader classLoader = new MemoryClassLoader();
+        
         for (Map.Entry<String, String> entry : encodeClassMap.entrySet()) {
             String className = entry.getKey();
             String base64Bytes = entry.getValue();
             byte[] classBytes = Base64.getDecoder().decode(base64Bytes);
-            defaultClassLoader.addClass(className, classBytes);
+            classLoader.addClass(className, classBytes);
         }
 
         try {
-            return defaultClassLoader.loadClass(mainClassName);
+            return classLoader.loadClass(mainClassName);
         } catch (ClassNotFoundException e) {
             throw new CompileException("load class fail", e);
         }

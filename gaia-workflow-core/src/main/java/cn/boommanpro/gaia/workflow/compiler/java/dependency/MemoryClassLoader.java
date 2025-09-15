@@ -22,14 +22,14 @@ public class MemoryClassLoader extends URLClassLoader {
 
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
-        // 1. 先尝试从缓存中加载
-        byte[] classBytes = classCache.get(name);
-        if (classBytes != null) {
-            return defineClass(name, classBytes, 0, classBytes.length);
-        }
 
         // 2. 缓存中没有，委托给父类加载器（双亲委派）
         try {
+            // 1. 先尝试从缓存中加载
+            byte[] classBytes = classCache.get(name);
+            if (classBytes != null) {
+                return defineClass(name, classBytes, 0, classBytes.length);
+            }
             return super.findClass(name);
         } catch (ClassNotFoundException e) {
             // 父类加载器也找不到，抛出异常

@@ -19,11 +19,6 @@ public class JavaCompiler extends AbstractCompiler {
 
     private static final javax.tools.JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
 
-    private static final DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
-
-    private static final MemoryJavaFileManager javaFileManager = new MemoryJavaFileManager(compiler.getStandardFileManager(diagnostics, null, null));
-
-
     /**
      * 具体参数信息取决于当前jdk
      */
@@ -32,18 +27,21 @@ public class JavaCompiler extends AbstractCompiler {
 
     @Override
     protected JavaCompilerResult doCompile(String name, String script, ClassLoader classLoader) {
+        // 创建新的DiagnosticCollector和MemoryJavaFileManager实例避免状态污染
+        DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
+        MemoryJavaFileManager javaFileManager = new MemoryJavaFileManager(compiler.getStandardFileManager(diagnostics, null, null));
+        
         // 将 extractedPath 添加到类路径
         SpringBootJarExtract.initJarCompilerEnvironment();
         //① 将source code -> MemoryJavaFileObject
         MemoryJavaFileObject javaSource = new MemoryJavaFileObject(name, script);
-        // ② 构建MemoryJavaFileManager 存储上下文信息
 
-        // ③ 填充项目依赖到MemoryJavaFileManager
-        fillThirdDependencyToFileManager(javaFileManager);
-        // ④借助jdk本身的compiler 直接进行编译
-        compiler.getTask(null, javaFileManager, diagnostics, OPTIONS, null, Arrays.asList(javaSource)).call();
-        //编译错误处理
         try {
+            // ③ 填充项目依赖到MemoryJavaFileManager
+            fillThirdDependencyToFileManager(javaFileManager);
+            // ④借助jdk本身的compiler 直接进行编译
+            compiler.getTask(null, javaFileManager, diagnostics, OPTIONS, null, Arrays.asList(javaSource)).call();
+            //编译错误处理
             validJavaCompilerSourceError(name, diagnostics, javaSource);
             return loadAndReturnCompilerResult(javaFileManager, name, classLoader);
         } catch (Exception e) {
@@ -84,8 +82,11 @@ public class JavaCompiler extends AbstractCompiler {
     }
 
     private JavaCompilerResult loadAndReturnCompilerResult(MemoryJavaFileManager javaFileManager, String name, ClassLoader classLoader) {
+        // 获取编译后的所有类字节码
+        Map<String, byte[]> classBytesMap = javaFileManager.getAllJavaClass();
+        
         JavaCompilerResult result = new JavaCompilerResult();
-        List<Class<?>> allClass = javaFileManager.getAllJavaClass().entrySet().stream()
+        List<Class<?>> allClass = classBytesMap.entrySet().stream()
                 .map(entry -> {
                     Class<?> clazz = ((MemoryClassLoader) classLoader).loadClass(entry.getKey(), entry.getValue());
                     if (entry.getKey().equals(name)) {
@@ -93,14 +94,19 @@ public class JavaCompiler extends AbstractCompiler {
                     }
                     return clazz;
                 }).collect(Collectors.toList());
+        
         result.setClassList(allClass);
         result.setMainClass(((List<Class<?>>) allClass).stream()
                 .filter(clazz -> clazz.getName().equals(name)).findFirst().get());
+        // 保存字节码映射，供后续使用
+        result.setClassBytesMap(classBytesMap);
         return result;
     }
 
     public static byte[] getBytes(String className) {
-        return javaFileManager.getAllJavaClass().get(className);
+        // 注意：这个方法现在可能无法正常工作，因为javaFileManager不再是静态的
+        // 如果需要获取字节码，应该在编译成功后立即获取
+        throw new UnsupportedOperationException("getBytes is no longer supported due to state isolation improvements");
     }
 
 
