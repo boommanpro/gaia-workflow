@@ -53,6 +53,7 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
             // 记录测试调用日志
             recordTestCallLog(schema, inputs, result, startTime, null, workflow);
 
+
             return result;
         } catch (Exception e) {
             logger.error("执行工作流失败", e);
@@ -62,29 +63,6 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
         }
     }
 
-    @Override
-    public void processExecutionResult(TaskInfo taskInfo, String schema, Map<String, Object> inputs, Map<String, Object> outputs) {
-        GaiaWorkflow workflow = null;
-        try {
-            // 使用GaiaWorkflow获取执行报告
-            workflow = createWorkflow(schema);
-            // 执行工作流以获取报告
-            workflow.run(inputs);
-
-            // 处理节点执行报告
-            processNodeReports(taskInfo, workflow);
-
-            // 设置执行成功状态
-            updateTaskStatusToSuccess(taskInfo);
-
-            // 设置输出结果
-            taskInfo.setOutputs(outputs);
-        } catch (Exception e) {
-            logger.error("处理工作流执行结果失败", e);
-            // 处理异常
-            processExecutionException(taskInfo, e);
-        }
-    }
 
     @Override
     public void processExecutionException(TaskInfo taskInfo, Exception e) {
@@ -245,7 +223,7 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
                     report.getTimeCost(),
                     convertSnapshots(report.getSnapshots())
             );
-            
+
             taskNodeReports.put(nodeId, taskReport);
         });
 
@@ -261,41 +239,41 @@ public class GaiaWorkflowExecutor implements WorkflowExecutor, ApplicationContex
      */
     private ArrayList<Snapshot> convertSnapshots(java.util.List<Object> snapshots) {
         ArrayList<Snapshot> convertedSnapshots = new ArrayList<>();
-        
+
         for (Object snapshotObj : snapshots) {
             if (snapshotObj instanceof Map) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> snapshotMap = (Map<String, Object>) snapshotObj;
-                
+
                 Snapshot snapshot = new Snapshot();
                 snapshot.setId((String) snapshotMap.get("id"));
                 snapshot.setNodeID((String) snapshotMap.get("nodeID"));
-                
+
                 // 处理 inputs
                 Object inputs = snapshotMap.get("inputs");
                 if (inputs instanceof Map) {
                     snapshot.setInputs((Map<String, Object>) inputs);
                 }
-                
+
                 // 处理 outputs
                 Object outputs = snapshotMap.get("outputs");
                 if (outputs instanceof Map) {
                     snapshot.setOutputs((Map<String, Object>) outputs);
                 }
-                
+
                 // 处理 data
                 snapshot.setData(snapshotMap.get("data"));
-                
+
                 // 处理 branch
                 snapshot.setBranch((String) snapshotMap.get("branch"));
-                
+
                 // 处理 error
                 snapshot.setError((String) snapshotMap.get("error"));
-                
+
                 convertedSnapshots.add(snapshot);
             }
         }
-        
+
         return convertedSnapshots;
     }
 
