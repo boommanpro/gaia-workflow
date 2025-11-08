@@ -12,4 +12,15 @@ public class CodeNode extends BaseNode {
     public Map<String, Object> execute(Chain chain) {
         return chain.getMemory();
     }
+
+
+    @Override
+    public NodeTypeEnum getNodeType() {
+        return  NodeTypeEnum.CONDITION;
+    }
+
+    @Override
+    protected Map<String, Object> getParametersData(Chain chain) {
+        return chain.getMemory();
+    }
 }

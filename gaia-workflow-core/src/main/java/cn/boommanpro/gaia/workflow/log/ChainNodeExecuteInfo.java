@@ -1,17 +1,25 @@
 package cn.boommanpro.gaia.workflow.log;
 
-import cn.boommanpro.gaia.workflow.model.ChainEdge;
-import cn.boommanpro.gaia.workflow.model.ChainNode;
+import cn.boommanpro.gaia.workflow.node.NodeTypeEnum;
 import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
+/**
+ * 节点执行信息
+ * 记录节点的执行状态和相关信息
+ *
+ * @author <a href="mailto:boommanpro@gmail.com">boommanpro</a>
+ * @date 2025/08/22
+ */
 @Data
 public class ChainNodeExecuteInfo {
+
     private String id;
+    private NodeTypeEnum type;
+    private String branch;
     private ChainNodeStatus status;
     private Long triggerTime;
     private Long startTime;
@@ -19,12 +27,19 @@ public class ChainNodeExecuteInfo {
     private String inputsResult;
     private String executeResult;
     private String outputResult;
-    private String exception; // 添加异常信息字段
-    private List<String> inwardEdges=new ArrayList<>();
+    private List<String> inwardEdges = new ArrayList<>();
+    private String exception;
 
     public void trigger() {
         if (triggerTime == null) {
             triggerTime = System.currentTimeMillis();
         }
+    }
+
+    public void setStartTime(Long startTime) {
+        if (this.startTime != null) {
+            return;
+        }
+        this.startTime = startTime;
     }
 }

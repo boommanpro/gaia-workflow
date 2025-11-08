@@ -1,5 +1,6 @@
 package cn.boommanpro.gaia.workflow;
 
+import cn.boommanpro.gaia.workflow.listener.ChainExecutionListener;
 import cn.boommanpro.gaia.workflow.log.ChainNodeExecuteInfo;
 import cn.boommanpro.gaia.workflow.model.Chain;
 import cn.boommanpro.gaia.workflow.parser.ChainParser;
@@ -13,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 public class GaiaWorkflow {
 
@@ -57,6 +59,56 @@ public class GaiaWorkflow {
     }
 
     /**
+     * 异步执行工作流（非阻塞）
+     * 支持实时状态更新和进度监听
+     *
+     * @param inputs 输入参数
+     * @return CompletableFuture 执行结果
+     */
+    public CompletableFuture<Map<String, Object>> runAsync(Map<String, Object> inputs) {
+        Chain chain = toChain();
+        return chain.executeAsync(inputs);
+    }
+
+    /**
+     * 异步执行工作流（无输入参数）
+     *
+     * @return CompletableFuture 执行结果
+     */
+    public CompletableFuture<Map<String, Object>> runAsync() {
+        return runAsync(new HashMap<>());
+    }
+
+    /**
+     * 添加执行监听器
+     *
+     * @param listener 监听器
+     */
+    public void addListener(ChainExecutionListener listener) {
+        Chain chain = toChain();
+        chain.addListener(listener);
+    }
+
+    /**
+     * 移除执行监听器
+     *
+     * @param listener 监听器
+     */
+    public void removeListener(ChainExecutionListener listener) {
+        Chain chain = toChain();
+        chain.removeListener(listener);
+    }
+
+    /**
+     * 关闭异步执行相关资源
+     */
+    public void shutdownAsyncExecution() {
+        if (chain != null) {
+            chain.shutdownAsyncExecution();
+        }
+    }
+
+    /**
      * 获取节点执行报告
      *
      * @return 节点执行报告
@@ -72,8 +124,10 @@ public class GaiaWorkflow {
             
             // 计算执行时长
             long timeCost = 0;
-            if (info.getStartTime() != null && info.getEndTime() != null) {
-                timeCost = info.getEndTime() - info.getStartTime();
+            Long startTime = info.getStartTime();
+            Long endTime = info.getEndTime();
+            if (startTime != null && endTime != null) {
+                timeCost = endTime - startTime;
             }
             
             // 创建 snapshots 列表

@@ -1,51 +1,89 @@
 package cn.boommanpro.gaia.workflow.model;
 
+import cn.boommanpro.gaia.workflow.condition.NodeCondition;
 import cn.boommanpro.gaia.workflow.node.NodeTypeEnum;
 import cn.boommanpro.gaia.workflow.param.Parameter;
 import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Data
-public abstract class ChainNode {
+public abstract class ChainNode implements Serializable {
 
-    private String id;
+    protected String id;
 
-    private String name;
+    protected String name;
 
-    private NodeTypeEnum nodeType;
+    protected String description;
 
-    private List<ChainEdge> inwardEdges=new ArrayList<>();
+    protected NodeTypeEnum nodeType;
 
-    private List<ChainEdge> outwardEdges=new ArrayList<>();
+    protected List<ChainEdge> inwardEdges = new ArrayList<>();
 
-    private ChainNodeStatus status= ChainNodeStatus.WAIT;
+    protected List<ChainEdge> outwardEdges = new ArrayList<>();
 
-    private boolean parallel;
+    protected ChainNodeStatus status = ChainNodeStatus.READY;
 
-    public abstract Map<String,Object> execute(Chain chain);
+    protected boolean parallel;
 
-    public List<Parameter> getParameters(){
+    // 执行相关属性
+    protected boolean async = false;
+    protected NodeCondition condition;
+
+    // 循环执行相关属性
+    protected boolean loopEnable = false;           // 是否启用循环执行
+    protected long loopIntervalMs = 1000;            // 循环间隔时间（毫秒）
+    protected NodeCondition loopBreakCondition;      // 跳出循环的条件
+    protected int maxLoopCount = 0;                  // 0 表示不限制循环次数
+
+    public abstract Map<String, Object> execute(Chain chain);
+
+    public List<Parameter> getParameters() {
         return new ArrayList<>();
     }
 
-    public List<Parameter> getOutputParameters(){
+    public List<Parameter> getOutputParameters() {
         return new ArrayList<>();
     }
 
     public void addOutwardEdge(ChainEdge edge) {
-        outwardEdges.add(edge);
+        if (this.outwardEdges == null) {
+            this.outwardEdges = new ArrayList<>();
+        }
+        this.outwardEdges.add(edge);
     }
 
     public void addInwardEdge(ChainEdge edge) {
-        inwardEdges.add(edge);
+        if (this.inwardEdges == null) {
+            this.inwardEdges = new ArrayList<>();
+        }
+        this.inwardEdges.add(edge);
     }
 
-    protected Map<String,Object> getParametersData(Chain chain) {
+    protected Map<String, Object> getParametersData(Chain chain) {
         return new HashMap<>();
+    }
+
+    /**
+     * 设置节点状态为完成
+     */
+    public void setNodeStatusFinished() {
+        if (this.status == ChainNodeStatus.FAILED) {
+            this.setStatus(ChainNodeStatus.FINISHED_ABNORMAL);
+        } else {
+            this.setStatus(ChainNodeStatus.FINISHED);
+        }
+    }
+
+    /**
+     * 通知事件（钩子方法，由Chain调用）
+     */
+    protected void notifyEvent(Object event) {
+        // 默认空实现，由Chain重写
     }
 }

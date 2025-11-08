@@ -1,6 +1,7 @@
 package cn.boommanpro.gaia.workflow.parser;
 
 import cn.boommanpro.gaia.workflow.GaiaWorkflow;
+import cn.boommanpro.gaia.workflow.common.ParameterParseUtils;
 import cn.boommanpro.gaia.workflow.node.CodeNode;
 import cn.boommanpro.gaia.workflow.node.DynamicCompileNode;
 import cn.boommanpro.gaia.workflow.node.JsFunExecNode;
@@ -33,8 +34,8 @@ public class CodeNodeParser extends BaseNodeParser<CodeNode> {
 
     @Override
     public CodeNode buildInstance(JSONObject nodeJSONObject, GaiaWorkflow workflow) {
-        String scriptContent = nodeJSONObject.getByPath(SCRIPT_CONTENT_PATH).toString();
-        String scriptLanguage = nodeJSONObject.getByPath(SCRIPT_LANGUAGE_PATH, String.class);
+        String scriptContent = ParameterParseUtils.getStringByPath(nodeJSONObject, SCRIPT_CONTENT_PATH);
+        String scriptLanguage = ParameterParseUtils.getStringByPath(nodeJSONObject, SCRIPT_LANGUAGE_PATH);
 
         CodeNode codeNode;
         if (scriptLanguage == null || "jsReturn".equalsIgnoreCase(scriptLanguage)) {
@@ -45,12 +46,13 @@ public class CodeNodeParser extends BaseNodeParser<CodeNode> {
             codeNode = new DynamicCompileNode(scriptContent, scriptLanguage);
         }
 
-        JSONObject inputsSchema = (JSONObject) nodeJSONObject.getByPath(INPUTS_JSON_PATH);
-        JSONObject inputsValues = (JSONObject) nodeJSONObject.getByPath(INPUTS_VALUES_JSON_PATH);
+        // 使用通用工具类解析参数
+        JSONObject inputsSchema = ParameterParseUtils.getJSONObjectByPath(nodeJSONObject, INPUTS_JSON_PATH);
+        JSONObject inputsValues = ParameterParseUtils.getJSONObjectByPath(nodeJSONObject, INPUTS_VALUES_JSON_PATH);
         codeNode.setParameters(parseNodeParameters(inputsSchema, inputsValues));
 
-        JSONObject outputsSchema = (JSONObject) nodeJSONObject.getByPath(OUTPUTS_JSON_PATH);
-        JSONObject outputsValues = (JSONObject) nodeJSONObject.getByPath(OUTPUTS_VALUES_JSON_PATH);
+        JSONObject outputsSchema = ParameterParseUtils.getJSONObjectByPath(nodeJSONObject, OUTPUTS_JSON_PATH);
+        JSONObject outputsValues = ParameterParseUtils.getJSONObjectByPath(nodeJSONObject, OUTPUTS_VALUES_JSON_PATH);
         codeNode.setOutputParameters(parseNodeParameters(outputsSchema, outputsValues));
 
         return codeNode;

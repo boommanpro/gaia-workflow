@@ -1,6 +1,8 @@
 package cn.boommanpro.gaiaworkflow.executor.impl;
 
 import cn.boommanpro.gaia.workflow.GaiaWorkflow;
+import cn.boommanpro.gaia.workflow.listener.ChainExecutionListener;
+import cn.boommanpro.gaia.workflow.log.ChainNodeExecuteInfo;
 import cn.boommanpro.gaiaworkflow.executor.AsyncWorkflowExecutor;
 import cn.boommanpro.gaiaworkflow.executor.WorkflowExecutor;
 import cn.boommanpro.gaiaworkflow.input.TaskRunInput;
@@ -24,6 +26,7 @@ import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -50,13 +53,11 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
      */
     private ExecutorService executorService;
 
-    private final WorkflowExecutor workflowExecutor;
     private final TaskRepository taskRepository;
     private ApplicationContext applicationContext;
 
     @Autowired
-    public ThreadPoolAsyncWorkflowExecutor(WorkflowExecutor workflowExecutor, TaskRepository taskRepository) {
-        this.workflowExecutor = workflowExecutor;
+    public ThreadPoolAsyncWorkflowExecutor( TaskRepository taskRepository) {
         this.taskRepository = taskRepository;
     }
 
@@ -94,53 +95,48 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
                 // 更新工作流状态为处理中
                 updateTaskStatus(taskId, taskInfo, NodeStatus.PROCESSING);
 
-                // 直接执行工作流并获取结果
                 long startTime = System.currentTimeMillis();
                 GaiaWorkflow workflow = new GaiaWorkflow(input.getSchema());
-                
-                Map<String, Object> outputs;
-                Exception workflowException = null;
-                
-                try {
-                    outputs = workflow.run(input.getInputs());
-                } catch (Exception e) {
-                    // 捕获工作流执行异常，但不立即抛出
-                    workflowException = e;
-                    outputs = new HashMap<>(); // 空的输出结果
-                }
-                
-                long costTime = System.currentTimeMillis() - startTime;
 
-                // 处理节点执行报告
-                processNodeReports(taskId, taskInfo, workflow);
-
-                // 根据是否有异常设置工作流状态
-                if (workflowException == null) {
-                    // 没有异常，设置为成功状态
-                    taskInfo.getWorkflowStatus().setStatus(NodeStatus.SUCCESS.getValue());
-                } else {
-                    // 有异常，设置为失败状态
-                    taskInfo.getWorkflowStatus().setStatus(NodeStatus.FAIL.getValue());
-                    
-                    // 记录错误信息
-                    Messages messages = taskInfo.getMessages();
-                    if (messages == null) {
-                        messages = new Messages();
-                        taskInfo.setMessages(messages);
+                ChainExecutionListener listener = new ChainExecutionListener() {
+                    @Override
+                    public void onNodeStatusChanged(String chainId, String nodeId, ChainNodeExecuteInfo executeInfo) {
+                        try {
+                            updateNodeStatus(taskId, taskInfo, nodeId, executeInfo);
+                        } catch (Exception e) {
+                            logger.warn("更新节点状态失败, taskId: {}, nodeId: {}", taskId, nodeId, e);
+                        }
                     }
-                    messages.getError().add(new ErrorMessage("workflow", workflowException.getMessage()));
-                }
-                
-                taskInfo.getWorkflowStatus().setTerminated(true);
+                    @Override
+                    public void onProgressUpdate(String chainId, Map<String, ChainNodeExecuteInfo> executeInfoMap,
+                                                 int completedNodes, int totalNodes) {
+                        // 简化实现，不处理进度更新
+                    }
 
-                // 设置输出结果
-                taskInfo.setOutputs(outputs);
+                    @Override
+                    public void onExecutionComplete(String chainId, Map<String, Object> result, Exception exception) {
+                        try {
+                            handleExecutionComplete(taskId, taskInfo, workflow, input, result, exception, startTime);
+                        } catch (Exception e) {
+                            logger.error("处理工作流完成回调失败, taskId: {}", taskId, e);
+                        }
+                    }
+                };
+                // 添加监听器
+                workflow.addListener(listener);
 
-                // 记录测试调用日志
-                recordTestCallLog(taskId, taskInfo, input, outputs, costTime, workflowException);
+                // 异步执行工作流
+                workflow.runAsync(input.getInputs())
+                        .whenComplete((result, throwable) -> {
+                            try {
+                                // 确保资源被清理
+                                workflow.removeListener(listener);
+                                workflow.shutdownAsyncExecution();
+                            } catch (Exception e) {
+                                logger.warn("清理工作流资源失败, taskId: {}", taskId, e);
+                            }
+                        });
 
-                // 更新任务信息
-                taskRepository.updateTask(taskId, taskInfo);
             } catch (Exception e) {
                 logger.error("异步执行工作流失败", e);
                 // 处理执行异常
@@ -153,7 +149,7 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
     /**
      * 处理节点执行报告
      *
-     * @param taskId 任务ID
+     * @param taskId   任务ID
      * @param taskInfo 任务信息
      * @param workflow 工作流实例
      */
@@ -161,8 +157,9 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
         try {
             // 直接使用 GaiaWorkflow 提供的报告格式
             Map<String, GaiaWorkflow.NodeReport> nodeReports = workflow.getNodeReports();
-            Map<String, NodeReport> taskNodeReports = new HashMap<>();
 
+            // 获取现有的节点报告，如果不存在则创建新的
+            Map<String, NodeReport> taskNodeReports = taskInfo.getNodeReports();
             // 转换GaiaWorkflow.NodeReport为NodeReport
             nodeReports.forEach((nodeId, report) -> {
                 NodeReport taskReport = new NodeReport(
@@ -173,15 +170,39 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
                         report.getTimeCost(),
                         convertSnapshots(report.getSnapshots())
                 );
-                
+
                 taskNodeReports.put(nodeId, taskReport);
+                String newStatus = convertNodeStatus(report.getStatus());
+                List<Snapshot> newSnapshots = convertSnapshots(report.getSnapshots());
+
+                NodeReport existingReport = taskInfo.getNodeReports().get(nodeId);
+
+                if (existingReport != null) {
+                    // 只更新状态和时间信息，不处理snapshot（避免重复添加）
+                    // snapshot已经在onNodeStatusChanged和onProgressUpdate中处理过了
+                    existingReport.setStatus(newStatus);
+                    existingReport.setStartTime(report.getStartTime());
+                    existingReport.setEndTime(report.getEndTime());
+                    existingReport.setTimeCost(report.getTimeCost());
+                } else {
+                    // 不存在则加入，包含完整的snapshot信息
+                     taskReport = new NodeReport(
+                            report.getId(),
+                            newStatus,
+                            report.getStartTime(),
+                            report.getEndTime(),
+                            report.getTimeCost(),
+                            newSnapshots
+                    );
+                    taskInfo.getNodeReports().put(nodeId, taskReport);
+                }
             });
 
             // 设置节点报告
             taskInfo.setNodeReports(taskNodeReports);
         } catch (Exception e) {
             logger.error("处理节点报告失败, taskId: {}", taskId, e);
-            
+
             // 即使处理报告失败，也要确保任务信息被正确设置
             if (taskInfo.getNodeReports() == null) {
                 taskInfo.setNodeReports(new HashMap<>());
@@ -197,41 +218,41 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
      */
     private ArrayList<Snapshot> convertSnapshots(java.util.List<Object> snapshots) {
         ArrayList<Snapshot> convertedSnapshots = new ArrayList<>();
-        
+
         for (Object snapshotObj : snapshots) {
             if (snapshotObj instanceof Map) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> snapshotMap = (Map<String, Object>) snapshotObj;
-                
+
                 Snapshot snapshot = new Snapshot();
                 snapshot.setId((String) snapshotMap.get("id"));
                 snapshot.setNodeID((String) snapshotMap.get("nodeID"));
-                
+
                 // 处理 inputs
                 Object inputs = snapshotMap.get("inputs");
                 if (inputs instanceof Map) {
                     snapshot.setInputs((Map<String, Object>) inputs);
                 }
-                
+
                 // 处理 outputs
                 Object outputs = snapshotMap.get("outputs");
                 if (outputs instanceof Map) {
                     snapshot.setOutputs((Map<String, Object>) outputs);
                 }
-                
+
                 // 处理 data
                 snapshot.setData(snapshotMap.get("data"));
-                
+
                 // 处理 branch
                 snapshot.setBranch((String) snapshotMap.get("branch"));
-                
+
                 // 处理 error
                 snapshot.setError((String) snapshotMap.get("error"));
-                
+
                 convertedSnapshots.add(snapshot);
             }
         }
-        
+
         return convertedSnapshots;
     }
 
@@ -267,19 +288,19 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
     /**
      * 记录测试调用日志
      *
-     * @param taskId 任务ID
-     * @param taskInfo 任务信息
-     * @param input 输入参数
-     * @param outputs 输出结果
-     * @param costTime 耗时
+     * @param taskId    任务ID
+     * @param taskInfo  任务信息
+     * @param input     输入参数
+     * @param outputs   输出结果
+     * @param costTime  耗时
      * @param exception 异常信息（如果有的话）
      */
-    private void recordTestCallLog(String taskId, TaskInfo taskInfo, TaskRunInput input, 
+    private void recordTestCallLog(String taskId, TaskInfo taskInfo, TaskRunInput input,
                                   Map<String, Object> outputs, long costTime, Exception exception) {
         try {
             String schema = input.getSchema();
             Map<String, Object> inputs = input.getInputs();
-            
+
             // 解析工作流编码和版本ID（从schema中获取）
             String workflowCode = parseWorkflowCodeFromSchema(schema);
             Long versionId = parseVersionIdFromSchema(schema);
@@ -301,17 +322,17 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
                 Object testCallLogRecorder = applicationContext.getBean("testCallLogRecorderImpl");
                 if (testCallLogRecorder != null) {
                     testCallLogRecorder.getClass().getMethod("recordTestCallLog",
-                            String.class, Long.class, String.class, Long.class,
-                            String.class, String.class, String.class, String.class, String.class)
-                        .invoke(testCallLogRecorder,
-                                workflowCode, versionId, workflowContent,
-                                costTime, execParam, execStatus,
-                                reports, callResult, errorMessage);
+                                    String.class, Long.class, String.class, Long.class,
+                                    String.class, String.class, String.class, String.class, String.class)
+                            .invoke(testCallLogRecorder,
+                                    workflowCode, versionId, workflowContent,
+                                    costTime, execParam, execStatus,
+                                    reports, callResult, errorMessage);
                 }
             } catch (Exception e) {
                 // 如果获取或调用Bean失败，则仅记录到日志中
                 logger.info("Test call log - TaskId: {}, WorkflowCode: {}, VersionId: {}, CostTime: {}ms, Status: {}, Error: {}",
-                           taskId, workflowCode, versionId, costTime, execStatus, errorMessage);
+                        taskId, workflowCode, versionId, costTime, execStatus, errorMessage);
             }
 
         } catch (Exception e) {
@@ -354,16 +375,16 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
     /**
      * 处理执行异常
      *
-     * @param taskId 任务ID
+     * @param taskId   任务ID
      * @param taskInfo 任务信息
-     * @param e 异常
+     * @param e        异常
      */
     private void processExecutionException(String taskId, TaskInfo taskInfo, Exception e) {
         try {
             logger.error("工作流执行异常, taskId: {}", taskId, e);
             taskInfo.getWorkflowStatus().setStatus(NodeStatus.FAIL.getValue());
             taskInfo.getWorkflowStatus().setTerminated(true);
-            
+
             // 记录错误信息
             Messages messages = taskInfo.getMessages();
             if (messages == null) {
@@ -371,7 +392,7 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
                 taskInfo.setMessages(messages);
             }
             messages.getError().add(new ErrorMessage("workflow", e.getMessage()));
-            
+
             // 记录测试调用日志（包含错误信息）
             recordTestCallLog(taskId, taskInfo, new TaskRunInput() {{
                 setSchema(taskInfo.getSchema());
@@ -383,14 +404,223 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
     }
 
     /**
+     * 更新节点状态
+     * 简化实现：只监听节点状态变更并存储
+     *
+     * @param taskId       任务ID
+     * @param taskInfo     任务信息
+     * @param nodeId       节点ID
+     * @param executeInfo  节点执行信息
+     */
+    private void updateNodeStatus(String taskId, TaskInfo taskInfo, String nodeId, ChainNodeExecuteInfo executeInfo) {
+        try {
+            // 获取现有的节点报告，如果不存在则创建新的
+            Map<String, NodeReport> taskNodeReports = taskInfo.getNodeReports();
+            if (taskNodeReports == null) {
+                taskNodeReports = new HashMap<>();
+                taskInfo.setNodeReports(taskNodeReports);
+            }
+
+            // 计算执行时长
+            long timeCost = 0;
+            if (executeInfo.getStartTime() != null && executeInfo.getEndTime() != null) {
+                timeCost = executeInfo.getEndTime() - executeInfo.getStartTime();
+            }
+
+            String newStatus = convertNodeStatus(executeInfo.getStatus().name());
+            NodeReport existingReport = taskNodeReports.get(nodeId);
+
+            if (existingReport != null) {
+                // 更新现有节点的状态和时间信息
+                existingReport.setStatus(newStatus);
+                existingReport.setStartTime(executeInfo.getStartTime());
+                existingReport.setEndTime(executeInfo.getEndTime());
+                existingReport.setTimeCost(timeCost);
+
+                // 只有在节点完成时才创建和添加 snapshot
+                if (isNodeCompleted(executeInfo.getStatus())) {
+                    Snapshot snapshot = createSnapshot(executeInfo);
+                    addSnapshotToReport(existingReport, snapshot);
+                }
+            } else {
+                // 不存在则创建新的节点报告
+                ArrayList<Snapshot> snapshots = new ArrayList<>();
+
+                // 只有在节点完成时才创建 snapshot
+                if (isNodeCompleted(executeInfo.getStatus())) {
+                    Snapshot snapshot = createSnapshot(executeInfo);
+                    snapshots.add(snapshot);
+                }
+
+                NodeReport taskReport = new NodeReport(
+                        executeInfo.getId(),
+                        newStatus,
+                        executeInfo.getStartTime(),
+                        executeInfo.getEndTime(),
+                        timeCost,
+                        snapshots
+                );
+                taskNodeReports.put(nodeId, taskReport);
+            }
+
+            // 更新任务状态
+            taskRepository.updateTask(taskId, taskInfo);
+
+        } catch (Exception e) {
+            logger.warn("更新节点状态失败, taskId: {}, nodeId: {}", taskId, nodeId, e);
+        }
+    }
+
+
+    /**
+     * 判断节点是否已完成
+     *
+     * @param status 节点状态
+     * @return 是否已完成
+     */
+    private boolean isNodeCompleted(cn.boommanpro.gaia.workflow.status.ChainNodeStatus status) {
+        return status == cn.boommanpro.gaia.workflow.status.ChainNodeStatus.FINISHED ||
+               status == cn.boommanpro.gaia.workflow.status.ChainNodeStatus.FAILED ||
+               status == cn.boommanpro.gaia.workflow.status.ChainNodeStatus.SKIPPED;
+    }
+
+    /**
+     * 创建 snapshot 对象
+     *
+     * @param info 节点执行信息
+     * @return snapshot
+     */
+    private Snapshot createSnapshot(ChainNodeExecuteInfo info) {
+        Snapshot snapshot = new Snapshot();
+
+        // 使用节点ID和时间戳创建唯一ID
+        String uniqueExecutionId = info.getId() + "_" + System.currentTimeMillis() + "_" + info.hashCode();
+        snapshot.setId(uniqueExecutionId);
+        snapshot.setNodeID(info.getId());
+
+        // 处理 inputs
+        if (info.getInputsResult() != null) {
+            try {
+                Map<String, Object> inputs = JSONUtil.parseObj(info.getInputsResult());
+                snapshot.setInputs(inputs);
+            } catch (Exception e) {
+                logger.debug("解析节点输入失败: {}", info.getId(), e);
+            }
+        }
+
+        // 处理 outputs
+        if (info.getOutputResult() != null) {
+            try {
+                Map<String, Object> outputs = JSONUtil.parseObj(info.getOutputResult());
+                snapshot.setOutputs(outputs);
+            } catch (Exception e) {
+                logger.debug("解析节点输出失败: {}", info.getId(), e);
+            }
+        }
+
+        // 处理 data
+        if (info.getExecuteResult() != null) {
+            try {
+                Object data = JSONUtil.parse(info.getExecuteResult());
+                snapshot.setData(data);
+            } catch (Exception e) {
+                logger.debug("解析节点数据失败: {}", info.getId(), e);
+            }
+        }
+
+        // 处理 error
+        if (info.getStatus() != null && info.getStatus().name().contains("FAILED")) {
+            String error = info.getException() != null ? info.getException() : "执行失败";
+            snapshot.setError(error);
+        }
+
+        snapshot.setBranch(info.getBranch());
+        return snapshot;
+    }
+
+    /**
+     * 将 snapshot 添加到节点报告中
+     * 对于循环节点，每次执行都添加新的 snapshot
+     * 对于普通节点，只保留最新的 snapshot
+     *
+     * @param report   节点报告
+     * @param snapshot 新的 snapshot
+     */
+    private void addSnapshotToReport(NodeReport report, Snapshot snapshot) {
+        List<Snapshot> existingSnapshots = report.getSnapshots();
+        if (existingSnapshots == null) {
+            existingSnapshots = new ArrayList<>();
+            report.setSnapshots(existingSnapshots);
+        }
+
+        // 直接添加新的 snapshot
+        // 这样循环节点的每次执行都会被记录
+        // 而普通节点也会在每次完成时添加（符合预期）
+        existingSnapshots.add(snapshot);
+    }
+
+    /**
+     * 处理工作流执行完成
+     *
+     * @param taskId    任务ID
+     * @param taskInfo  任务信息
+     * @param workflow  工作流实例
+     * @param input     输入参数
+     * @param result    执行结果
+     * @param exception 异常信息
+     * @param startTime 开始时间
+     */
+    private void handleExecutionComplete(String taskId, TaskInfo taskInfo, GaiaWorkflow workflow,
+                                         TaskRunInput input, Map<String, Object> result, Exception exception, long startTime) {
+        try {
+            long costTime = System.currentTimeMillis() - startTime;
+
+            // 处理节点执行报告
+            processNodeReports(taskId, taskInfo, workflow);
+
+            // 根据是否有异常设置工作流状态
+            if (exception == null) {
+                // 没有异常，设置为成功状态
+                taskInfo.getWorkflowStatus().setStatus(NodeStatus.SUCCESS.getValue());
+            } else {
+                // 有异常，设置为失败状态
+                taskInfo.getWorkflowStatus().setStatus(NodeStatus.FAIL.getValue());
+
+                // 记录错误信息
+                Messages messages = taskInfo.getMessages();
+                if (messages == null) {
+                    messages = new Messages();
+                    taskInfo.setMessages(messages);
+                }
+                messages.getError().add(new ErrorMessage("workflow", exception.getMessage()));
+            }
+
+            taskInfo.getWorkflowStatus().setTerminated(true);
+
+            // 设置输出结果
+            taskInfo.setOutputs(result);
+
+            // 记录测试调用日志
+            recordTestCallLog(taskId, taskInfo, input, result, costTime, exception);
+
+            // 更新任务信息
+            taskRepository.updateTask(taskId, taskInfo);
+
+        } catch (Exception e) {
+            logger.error("处理工作流完成回调失败, taskId: {}", taskId, e);
+        }
+    }
+
+    /**
      * 更新任务状态
      *
-     * @param taskId 任务ID
+     * @param taskId   任务ID
      * @param taskInfo 任务信息
-     * @param status 状态
+     * @param status   状态
      */
     private void updateTaskStatus(String taskId, TaskInfo taskInfo, NodeStatus status) {
         taskInfo.getWorkflowStatus().setStatus(status.getValue());
         taskRepository.updateTask(taskId, taskInfo);
     }
+
 }

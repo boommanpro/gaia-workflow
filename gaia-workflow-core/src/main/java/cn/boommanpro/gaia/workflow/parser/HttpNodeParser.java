@@ -14,13 +14,13 @@ public class HttpNodeParser extends BaseNodeParser<HttpNode> {
     @Override
     public HttpNode buildInstance(JSONObject nodeJSONObject, GaiaWorkflow workflow) {
         HttpNode httpNode = new HttpNode();
-        
+
         // 解析data对象
         JSONObject dataObj = nodeJSONObject.getJSONObject("data");
         if (dataObj == null) {
             return httpNode;
         }
-        
+
         // 解析api配置
         JSONObject apiObj = dataObj.getJSONObject("api");
         if (apiObj != null) {
@@ -29,19 +29,19 @@ public class HttpNodeParser extends BaseNodeParser<HttpNode> {
             apiConfig.setUrl(apiObj.get("url"));
             httpNode.setApi(apiConfig);
         }
-        
+
         // 解析headersValues
         JSONObject headersValuesObj = dataObj.getJSONObject("headersValues");
         if (headersValuesObj != null) {
             httpNode.setHeadersValues(headersValuesObj);
         }
-        
+
         // 解析paramsValues
         JSONObject paramsValuesObj = dataObj.getJSONObject("paramsValues");
         if (paramsValuesObj != null) {
             httpNode.setParamsValues(paramsValuesObj);
         }
-        
+
         // 解析body配置
         JSONObject bodyObj = dataObj.getJSONObject("body");
         if (bodyObj != null) {
@@ -50,7 +50,7 @@ public class HttpNodeParser extends BaseNodeParser<HttpNode> {
             bodyConfig.setJson(bodyObj.get("json"));
             httpNode.setBody(bodyConfig);
         }
-        
+
         // 解析timeout配置
         JSONObject timeoutObj = dataObj.getJSONObject("timeout");
         if (timeoutObj != null) {
@@ -59,7 +59,7 @@ public class HttpNodeParser extends BaseNodeParser<HttpNode> {
             timeoutConfig.setRetryTimes(timeoutObj.getInt("retryTimes", 1));
             httpNode.setTimeout(timeoutConfig);
         }
-        
+
         return httpNode;
     }
 }

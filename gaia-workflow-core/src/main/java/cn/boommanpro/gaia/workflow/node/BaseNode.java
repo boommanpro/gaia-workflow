@@ -4,6 +4,7 @@ import cn.boommanpro.gaia.workflow.model.ChainNode;
 import cn.boommanpro.gaia.workflow.param.Parameter;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -16,6 +17,16 @@ import java.util.List;
 public abstract class BaseNode extends ChainNode {
     protected List<Parameter> parameters;
     protected List<Parameter> outputParameters;
+
+    @Override
+    public List<Parameter> getParameters() {
+        return parameters != null ? parameters : new ArrayList<>();
+    }
+
+    @Override
+    public List<Parameter> getOutputParameters() {
+        return outputParameters != null ? outputParameters : new ArrayList<>();
+    }
 
     public List<Parameter> addParameter() {
         return parameters;

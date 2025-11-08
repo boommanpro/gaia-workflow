@@ -11,7 +11,12 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -37,6 +42,17 @@ public class ChainParser {
         nodeParserMap.put(NodeTypeEnum.STRING_FORMAT.getCode(), new StringFormatCodeParser());
         nodeParserMap.put(NodeTypeEnum.VARIABLE.getCode(), new VariableNodeParser());
         nodeParserMap.put(NodeTypeEnum.HTTP.getCode(), new HttpNodeParser());
+        nodeParserMap.put(NodeTypeEnum.LLM.getCode(), new LlmNodeParser());
+        nodeParserMap.put(NodeTypeEnum.CONDITION.getCode(), new ConditionNodeParser());
+        nodeParserMap.put(NodeTypeEnum.LOOP.getCode(), new LoopNodeParser());
+        nodeParserMap.put(NodeTypeEnum.BLOCK_START.getCode(), new BlockStartNodeParser());
+        nodeParserMap.put(NodeTypeEnum.BLOCK_END.getCode(), new BlockEndNodeParser());
+        nodeParserMap.put(NodeTypeEnum.CONTINUE.getCode(), new ContinueNodeParser());
+        nodeParserMap.put(NodeTypeEnum.BREAK.getCode(), new BreakNodeParser());
+    }
+
+    public Map<String, NodeParser> getNodeParserMap() {
+        return nodeParserMap;
     }
 
     public Chain parse(JSONArray nodes, JSONArray edges, GaiaWorkflow workflow) {
@@ -44,7 +60,7 @@ public class ChainParser {
         for (int i = 0; i < nodes.size(); i++) {
             JSONObject nodeJSONObject = nodes.getJSONObject(i);
             String type = nodeJSONObject.getStr("type");
-            if (NodeTypeEnum.NOTE.getCode().equals(type)||NodeTypeEnum.COMMENT.getCode().equals(type)) {
+            if (NodeTypeEnum.notParse(type)) {
                 continue;
             }
             ChainNode node = nodeParserMap.get(type).parse(nodeJSONObject, workflow);
@@ -69,14 +85,17 @@ public class ChainParser {
         Map<String, Set<String>> nodeDownstreams = new HashMap<>();
 
         // 构建节点依赖关系
-        for (ChainEdge edge : chain.getEdges()) {
+        List<ChainEdge> edges = chain.getEdges();
+        if (edges != null) {
+            for (ChainEdge edge : edges) {
             String sourceId = edge.getSource();
             String targetId = edge.getTarget();
 
             // 记录下游节点
             nodeDownstreams.computeIfAbsent(sourceId, k -> new HashSet<>()).add(targetId);
             // 记录上游节点
-            nodeUpstreams.computeIfAbsent(targetId, k -> new HashSet<>()).add(sourceId);
+                nodeUpstreams.computeIfAbsent(targetId, k -> new HashSet<>()).add(sourceId);
+            }
         }
 
         // 查找开始节点
@@ -111,9 +130,10 @@ public class ChainParser {
         edge.setId(String.format("%s_%s_%s", edgeObject.getStr("sourceNodeID"), edgeObject.getStr("targetNodeID"), edgeObject.getStr("sourcePortID")));
         edge.setSource(edgeObject.getStr("sourceNodeID"));
         edge.setTarget(edgeObject.getStr("targetNodeID"));
+        edge.setSourcePortID(edgeObject.getStr("sourcePortID"));
 
 
-        String conditionString = edgeObject.getStr("sourcePortID");
+        String conditionString = edge.getSourcePortID();
         if (StrUtil.isNotBlank(conditionString)) {
 //            edge.setCondition(new JavascriptStringCondition(conditionString.trim()));
             edge.setCondition(new EdgeCondition() {

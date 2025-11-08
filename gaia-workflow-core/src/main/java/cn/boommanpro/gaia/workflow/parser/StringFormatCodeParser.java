@@ -20,13 +20,13 @@ public class StringFormatCodeParser extends BaseNodeParser<StringFormatCode> {
     @Override
     public StringFormatCode buildInstance(JSONObject nodeJSONObject, GaiaWorkflow workflow) {
         StringFormatCode stringFormatCode = new StringFormatCode();
-        
+
         // 设置格式化字符串
         Object scriptContentObj = nodeJSONObject.getByPath(SCRIPT_CONTENT_PATH);
         if (scriptContentObj != null) {
             stringFormatCode.setFormatString(scriptContentObj.toString());
         }
-        
+
         // 设置语言类型
         Object languageObj = nodeJSONObject.getByPath(SCRIPT_LANGUAGE_PATH);
         if (languageObj != null) {

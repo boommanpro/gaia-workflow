@@ -10,6 +10,8 @@ public enum ChainNodeStatus {
     WAIT("wait", "等待执行"),
     RUNNING("running", "正在执行"),
     FINISHED("finished", "执行完成"),
+    FINISHED_NORMAL("finished_normal", "正常完成"),
+    FINISHED_ABNORMAL("finished_abnormal", "异常完成"),
     FAILED("failed", "执行失败"),
     SKIPPED("skipped", "跳过执行"),
     ;
