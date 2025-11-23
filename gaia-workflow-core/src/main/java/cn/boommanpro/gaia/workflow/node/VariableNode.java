@@ -109,12 +109,285 @@ public class VariableNode extends BaseNode {
             if (assign.getLeftType() == null || assign.getLeftType() != RefType.REF) {
                 Parameter param = new Parameter();
                 param.setName(assign.getLeft());
-                // 简化处理，实际应该根据右值类型推断
-                param.setType(cn.boommanpro.gaia.workflow.param.DataType.String);
+
+                // 根据右值的schema确定数据类型
+                cn.boommanpro.gaia.workflow.param.DataType dataType = inferDataType(assign.getRight());
+                param.setType(dataType);
+
+                // 如果是常量类型，设置默认值
+                if (assign.getRight() != null && assign.getRight().getType() == RefType.CONSTANT) {
+                    Object content = assign.getRight().getContent();
+                    Object convertedValue = convertDefaultValue(content, dataType);
+                    param.setDefaultValue(convertedValue);
+                }
+
                 parameters.add(param);
             }
         }
         return parameters;
+    }
+
+    /**
+     * 根据VariableValue的schema推断数据类型
+     * @param value 变量值定义
+     * @return 推断出的数据类型
+     */
+    private cn.boommanpro.gaia.workflow.param.DataType inferDataType(VariableValue value) {
+        if (value == null) {
+            return cn.boommanpro.gaia.workflow.param.DataType.String;
+        }
+
+        // 如果有schema定义，优先使用schema
+        if (value.getSchema() != null) {
+            JSONObject schema = value.getSchema();
+            String schemaType = schema.getStr("type");
+
+            if ("array".equals(schemaType)) {
+                // 检查数组元素的类型
+                Object items = schema.get("items");
+                if (items instanceof Map) {
+                    JSONObject itemsObj = (JSONObject) items;
+                    String itemsType = itemsObj.getStr("type");
+                    return getArrayType(itemsType);
+                }
+                // 默认使用Array_Object
+                return cn.boommanpro.gaia.workflow.param.DataType.Array_Object;
+            } else if ("object".equals(schemaType)) {
+                return cn.boommanpro.gaia.workflow.param.DataType.Object;
+            } else if ("number".equals(schemaType) || "integer".equals(schemaType)) {
+                return cn.boommanpro.gaia.workflow.param.DataType.Number;
+            } else if ("boolean".equals(schemaType)) {
+                return cn.boommanpro.gaia.workflow.param.DataType.Boolean;
+            }
+        }
+
+        // 根据内容类型推断
+        if (value.getType() == RefType.CONSTANT) {
+            Object content = value.getContent();
+            if (content instanceof List) {
+                // 检查列表中元素的类型来确定具体的数组类型
+                return inferListContentType((List<?>) content);
+            } else if (content instanceof Map) {
+                return cn.boommanpro.gaia.workflow.param.DataType.Object;
+            } else if (content instanceof Number) {
+                return cn.boommanpro.gaia.workflow.param.DataType.Number;
+            } else if (content instanceof Boolean) {
+                return cn.boommanpro.gaia.workflow.param.DataType.Boolean;
+            }
+        }
+
+        // 默认返回String类型
+        return cn.boommanpro.gaia.workflow.param.DataType.String;
+    }
+
+    /**
+     * 根据数组元素类型获取对应的数组数据类型
+     * @param itemsType 数组元素类型
+     * @return 对应的数组数据类型
+     */
+    private cn.boommanpro.gaia.workflow.param.DataType getArrayType(String itemsType) {
+        if ("string".equals(itemsType)) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_String;
+        } else if ("number".equals(itemsType) || "integer".equals(itemsType)) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_Number;
+        } else if ("boolean".equals(itemsType)) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_Boolean;
+        } else if ("object".equals(itemsType)) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_Object;
+        } else if ("file".equals(itemsType)) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_File;
+        }
+        // 默认使用Array_Object
+        return cn.boommanpro.gaia.workflow.param.DataType.Array_Object;
+    }
+
+    /**
+     * 根据列表内容推断列表的数据类型
+     * @param list 列表对象
+     * @return 对应的数组数据类型
+     */
+    private cn.boommanpro.gaia.workflow.param.DataType inferListContentType(List<?> list) {
+        if (list == null || list.isEmpty()) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_Object;
+        }
+
+        // 检查第一个元素的类型
+        Object firstElement = list.get(0);
+        if (firstElement instanceof String) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_String;
+        } else if (firstElement instanceof Number) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_Number;
+        } else if (firstElement instanceof Boolean) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_Boolean;
+        } else if (firstElement instanceof Map) {
+            return cn.boommanpro.gaia.workflow.param.DataType.Array_Object;
+        }
+
+        // 默认使用Array_String（示例中数组包含字符串）
+        return cn.boommanpro.gaia.workflow.param.DataType.Array_String;
+    }
+
+    /**
+     * 根据数据类型转换默认值
+     * @param content 原始内容
+     * @param dataType 目标数据类型
+     * @return 转换后的值
+     */
+    private Object convertDefaultValue(Object content, cn.boommanpro.gaia.workflow.param.DataType dataType) {
+        if (content == null) {
+            return null;
+        }
+
+        try {
+            // 对于数组类型，需要特殊处理
+            if (dataType.name().startsWith("Array_")) {
+                return convertArrayDefaultValue(content, dataType);
+            }
+
+            // 对于非数组类型的基本转换
+            switch (dataType) {
+                case Number:
+                    if (content instanceof Number) {
+                        return content;
+                    } else if (content instanceof String) {
+                        return Double.parseDouble((String) content);
+                    }
+                    break;
+                case Boolean:
+                    if (content instanceof Boolean) {
+                        return content;
+                    } else if (content instanceof String) {
+                        return Boolean.parseBoolean((String) content);
+                    }
+                    break;
+                case Object:
+                    if (content instanceof Map) {
+                        return content;
+                    } else if (content instanceof String) {
+                        // 尝试解析为JSON对象
+                        try {
+                            return new JSONObject((String) content);
+                        } catch (Exception e) {
+                            // 解析失败，返回原字符串
+                            return content;
+                        }
+                    }
+                    break;
+                case String:
+                default:
+                    // 对于String类型或其他类型，直接返回toString()
+                    return content.toString();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to convert default value {} to type {}, using original value", content, dataType, e);
+        }
+
+        // 转换失败时返回原值
+        return content;
+    }
+
+    /**
+     * 转换数组类型的默认值
+     * @param content 原始内容
+     * @param dataType 数组数据类型
+     * @return 转换后的数组值
+     */
+    private Object convertArrayDefaultValue(Object content, cn.boommanpro.gaia.workflow.param.DataType dataType) {
+        try {
+            List<Object> resultList = new ArrayList<>();
+
+            if (content instanceof List) {
+                // 如果已经是List，直接处理
+                resultList = (List<Object>) content;
+            } else if (content instanceof String) {
+                // 如果是JSON字符串，解析为数组
+                try {
+                    cn.hutool.json.JSONArray jsonArray = new cn.hutool.json.JSONArray((String) content);
+                    for (int i = 0; i < jsonArray.size(); i++) {
+                        resultList.add(jsonArray.get(i));
+                    }
+                } catch (Exception e) {
+                    // 如果不是JSON数组格式，作为单个元素处理
+                    resultList.add(content);
+                }
+            } else {
+                // 其他类型作为单个元素处理
+                resultList.add(content);
+            }
+
+            // 根据具体的数组类型进行元素类型转换
+            return convertArrayElements(resultList, dataType);
+
+        } catch (Exception e) {
+            log.warn("Failed to convert array default value {} to type {}, using original value", content, dataType, e);
+            return content;
+        }
+    }
+
+    /**
+     * 转换数组中元素的类型
+     * @param list 原始数组列表
+     * @param dataType 目标数组数据类型
+     * @return 转换后的数组列表
+     */
+    private List<Object> convertArrayElements(List<Object> list, cn.boommanpro.gaia.workflow.param.DataType dataType) {
+        List<Object> convertedList = new ArrayList<>();
+
+        for (Object item : list) {
+            try {
+                Object convertedItem = convertArrayElement(item, dataType);
+                convertedList.add(convertedItem);
+            } catch (Exception e) {
+                // 元素转换失败，保留原值
+                convertedList.add(item);
+            }
+        }
+
+        return convertedList;
+    }
+
+    /**
+     * 转换单个数组元素的类型
+     * @param item 数组元素
+     * @param arrayType 数组数据类型
+     * @return 转换后的元素
+     */
+    private Object convertArrayElement(Object item, cn.boommanpro.gaia.workflow.param.DataType arrayType) {
+        switch (arrayType) {
+            case Array_String:
+                return item != null ? item.toString() : null;
+            case Array_Number:
+                if (item instanceof Number) {
+                    return item;
+                } else if (item instanceof String) {
+                    return Double.parseDouble((String) item);
+                }
+                return 0.0;
+            case Array_Boolean:
+                if (item instanceof Boolean) {
+                    return item;
+                } else if (item instanceof String) {
+                    return Boolean.parseBoolean((String) item);
+                }
+                return false;
+            case Array_Object:
+                if (item instanceof Map) {
+                    return item;
+                } else if (item instanceof String) {
+                    try {
+                        return new JSONObject((String) item);
+                    } catch (Exception e) {
+                        // 解析失败，返回原字符串
+                        return item;
+                    }
+                }
+                return item;
+            case Array_File:
+                // 对于File类型，暂时返回原字符串
+                return item.toString();
+            default:
+                return item;
+        }
     }
 
     /**
@@ -145,5 +418,16 @@ public class VariableNode extends BaseNode {
         private Object content;
         // 值的schema定义
         private JSONObject schema;
+    }
+
+
+    @Override
+    public List<Parameter> getParameters() {
+        return super.getParameters();
+    }
+
+    @Override
+    protected Map<String, Object> getParametersData(Chain chain) {
+        return chain.getParametersData(this);
     }
 }

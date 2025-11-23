@@ -30,7 +30,7 @@ public class JavaCompiler extends AbstractCompiler {
         // 创建新的DiagnosticCollector和MemoryJavaFileManager实例避免状态污染
         DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
         MemoryJavaFileManager javaFileManager = new MemoryJavaFileManager(compiler.getStandardFileManager(diagnostics, null, null));
-        
+
         // 将 extractedPath 添加到类路径
         SpringBootJarExtract.initJarCompilerEnvironment();
         //① 将source code -> MemoryJavaFileObject
@@ -43,7 +43,7 @@ public class JavaCompiler extends AbstractCompiler {
             compiler.getTask(null, javaFileManager, diagnostics, OPTIONS, null, Arrays.asList(javaSource)).call();
             //编译错误处理
             validJavaCompilerSourceError(name, diagnostics, javaSource);
-            return loadAndReturnCompilerResult(javaFileManager, name, classLoader);
+            return loadAndReturnCompilerResult(script,javaFileManager, name, classLoader);
         } catch (Exception e) {
             throw new ScriptIllegalException("script compile ERROR!error message:" + e.getMessage(), e);
         } finally {
@@ -81,10 +81,10 @@ public class JavaCompiler extends AbstractCompiler {
         });
     }
 
-    private JavaCompilerResult loadAndReturnCompilerResult(MemoryJavaFileManager javaFileManager, String name, ClassLoader classLoader) {
+    private JavaCompilerResult loadAndReturnCompilerResult(String script, MemoryJavaFileManager javaFileManager, String name, ClassLoader classLoader) {
         // 获取编译后的所有类字节码
         Map<String, byte[]> classBytesMap = javaFileManager.getAllJavaClass();
-        
+
         JavaCompilerResult result = new JavaCompilerResult();
         List<Class<?>> allClass = classBytesMap.entrySet().stream()
                 .map(entry -> {
@@ -94,12 +94,13 @@ public class JavaCompiler extends AbstractCompiler {
                     }
                     return clazz;
                 }).collect(Collectors.toList());
-        
+
         result.setClassList(allClass);
         result.setMainClass(((List<Class<?>>) allClass).stream()
                 .filter(clazz -> clazz.getName().equals(name)).findFirst().get());
         // 保存字节码映射，供后续使用
         result.setClassBytesMap(classBytesMap);
+        result.setClazzCode(script);
         return result;
     }
 

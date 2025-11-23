@@ -4,7 +4,10 @@ import org.springframework.beans.BeansException;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextException;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.expression.*;
+import org.springframework.context.expression.BeanExpressionContextAccessor;
+import org.springframework.context.expression.BeanFactoryAccessor;
+import org.springframework.context.expression.BeanFactoryResolver;
+import org.springframework.context.expression.EnvironmentAccessor;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
@@ -86,7 +89,10 @@ public class SpringExpressionParser   {
             context = new StandardEvaluationContext();
             context.addPropertyAccessor(new BeanExpressionContextAccessor());
             context.addPropertyAccessor(new BeanFactoryAccessor());
-            context.addPropertyAccessor(new MapAccessor());
+            // 使用自定义的 SafeMapAccessor 替代默认的 MapAccessor
+            context.addPropertyAccessor(new SafeMapAccessor());
+            // 使用安全的反射属性访问器处理链式访问
+            context.addPropertyAccessor(new SafeReflectivePropertyAccessor());
             context.addPropertyAccessor(new EnvironmentAccessor());
             context.setBeanResolver(new BeanFactoryResolver(ac.getBeanFactory()));
             context.setTypeLocator(new StandardTypeLocator(ac.getBeanFactory().getBeanClassLoader()));

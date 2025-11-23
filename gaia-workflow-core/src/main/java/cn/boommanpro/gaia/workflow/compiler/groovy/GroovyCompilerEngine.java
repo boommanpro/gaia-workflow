@@ -12,7 +12,8 @@ public class GroovyCompilerEngine implements CompilerEngine {
     public CompileResult loadClass(String script) {
         try {
             Class<?> result = loader.parseClass(script);
-            return CompileResult.success(result);
+            //这里比较简单，没有对代码进行reformat
+            return CompileResult.success(result, script);
         } catch (Exception e) {
             return CompileResult.otherException(e);
         }

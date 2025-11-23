@@ -9,7 +9,8 @@ import java.util.Map;
 public class JavaCompilerResult {
 
     private Class<?> mainClass;
+    private String clazzCode;
     private List<Class<?>> classList;
     private Map<String, byte[]> classBytesMap;
-    
+
 }

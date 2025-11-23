@@ -1,18 +1,9 @@
 package cn.boommanpro.gaia.workflow.model;
 
 import cn.boommanpro.gaia.workflow.condition.EdgeCondition;
-import cn.boommanpro.gaia.workflow.event.ChainEndEvent;
-import cn.boommanpro.gaia.workflow.event.ChainEvent;
-import cn.boommanpro.gaia.workflow.event.ChainStartEvent;
-import cn.boommanpro.gaia.workflow.event.ChainStatusChangeEvent;
-import cn.boommanpro.gaia.workflow.event.NodeStartEvent;
+import cn.boommanpro.gaia.workflow.event.*;
 import cn.boommanpro.gaia.workflow.exception.ChainException;
-import cn.boommanpro.gaia.workflow.listener.ChainErrorListener;
-import cn.boommanpro.gaia.workflow.listener.ChainEventListener;
-import cn.boommanpro.gaia.workflow.listener.ChainExecutionListener;
-import cn.boommanpro.gaia.workflow.listener.ChainOutputListener;
-import cn.boommanpro.gaia.workflow.listener.ChainSuspendListener;
-import cn.boommanpro.gaia.workflow.listener.NodeErrorListener;
+import cn.boommanpro.gaia.workflow.listener.*;
 import cn.boommanpro.gaia.workflow.log.ChainNodeExecuteInfo;
 import cn.boommanpro.gaia.workflow.node.NodeTypeEnum;
 import cn.boommanpro.gaia.workflow.param.Parameter;
@@ -28,22 +19,8 @@ import cn.hutool.json.JSONUtil;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Phaser;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.stream.Collectors;
 
 /**
@@ -309,7 +286,7 @@ public class Chain extends ChainNode {
             }
         }
 
-        return this.executeResult;
+        return this.outputResult;
     }
 
     @Override
@@ -367,7 +344,7 @@ public class Chain extends ChainNode {
      * 统一的节点执行内部方法
      *
      * @param chainNode 节点
-     * @param isAsync 是否异步执行
+     * @param isAsync   是否异步执行
      */
     private void doExecuteNodeInternal(ChainNode chainNode, boolean isAsync) {
         synchronized (chainNode) {
@@ -375,32 +352,21 @@ public class Chain extends ChainNode {
             ChainNodeExecuteInfo chainNodeExecuteInfo = executeInfoMap.get(chainNode.getId());
             chainNode.setStatus(chainNodeExecuteInfo.getStatus());
 
+
+            if (chainNode.getStatus() == ChainNodeStatus.WAIT) {
+                return;
+            }
+            chainNodeExecuteInfo.trigger();
             // 异步模式下通知节点状态变化
             if (isAsync) {
                 notifyNodeStatusChanged(chainNode.getId(), chainNodeExecuteInfo);
             }
 
-            chainNodeExecuteInfo.trigger();
-            if (chainNode.getStatus() == ChainNodeStatus.WAIT) {
-                return;
-            }
             chainNodeExecuteInfo.setStartTime(System.currentTimeMillis());
             chainNodeExecuteInfo.setInwardEdges(chainNode.getInwardEdges().stream()
-                .filter(chainEdge -> chainEdge.getStatus() == ChainEdgeStatus.TRUE)
-                .map(ChainEdge::getId)
-                .collect(Collectors.toList()));
-
-            // 设置分支信息
-            chainNode.getInwardEdges().stream()
-                .filter(chainEdge -> chainEdge.getStatus() == ChainEdgeStatus.TRUE)
-                .findFirst()
-                .ifPresent(edge -> {
-                    if (isAsync) {
-                        chainNodeExecuteInfo.setBranch(edge.getSourcePortID());
-                    } else {
-                        chainNodeExecuteInfo.setBranch(edge.getId());
-                    }
-                });
+                    .filter(chainEdge -> chainEdge.getStatus() == ChainEdgeStatus.TRUE)
+                    .map(ChainEdge::getId)
+                    .collect(Collectors.toList()));
 
             if (chainNodeExecuteInfo.getStatus() == ChainNodeStatus.READY) {
                 Map<String, Object> executeResult = null;
@@ -481,17 +447,18 @@ public class Chain extends ChainNode {
             onNodeExecuteAfter(nodeContext);
 
             // 处理后续节点
-            processSubsequentNodes(chainNode, isAsync);
+            processSubsequentNodes(chainNode,chainNodeExecuteInfo, isAsync);
         }
     }
 
     /**
      * 处理后续节点
      *
-     * @param chainNode 当前节点
-     * @param isAsync 是否异步执行
+     * @param chainNode            当前节点
+     * @param chainNodeExecuteInfo
+     * @param isAsync              是否异步执行
      */
-    private void processSubsequentNodes(ChainNode chainNode, boolean isAsync) {
+    private void processSubsequentNodes(ChainNode chainNode, ChainNodeExecuteInfo chainNodeExecuteInfo, boolean isAsync) {
         if (chainNode.getStatus() == ChainNodeStatus.FINISHED) {
             for (ChainEdge outwardEdge : chainNode.getOutwardEdges()) {
                 EdgeCondition condition = outwardEdge.getCondition();
@@ -502,6 +469,10 @@ public class Chain extends ChainNode {
                 }
                 if (condition.check(this, outwardEdge)) {
                     outwardEdge.setStatus(ChainEdgeStatus.TRUE);
+                    chainNodeExecuteInfo.setBranch(outwardEdge.getSourcePortID());
+                    if (isAsync) {
+                        notifyNodeStatusChanged(chainNode.getId(), chainNodeExecuteInfo);
+                    }
                     executeNextNode(outwardEdge.getTarget(), isAsync);
                 } else {
                     outwardEdge.setStatus(ChainEdgeStatus.FALSE);
@@ -520,15 +491,11 @@ public class Chain extends ChainNode {
      * 执行下一个节点
      *
      * @param targetNodeId 目标节点ID
-     * @param isAsync 是否异步执行
+     * @param isAsync      是否异步执行
      */
     private void executeNextNode(String targetNodeId, boolean isAsync) {
         ChainNode targetNode = getNodeById(targetNodeId);
-        if (isAsync) {
-            doExecuteNodeInternal(targetNode, true);
-        } else {
-            doExecuteNodeInternal(targetNode, true);
-        }
+        doExecuteNodeInternal(targetNode, true);
     }
 
     /**
@@ -558,12 +525,16 @@ public class Chain extends ChainNode {
             ChainNodeExecuteInfo info = new ChainNodeExecuteInfo();
             info.setId(id);
             info.setType(chainNode.getNodeType());
+            info.setExecuteInfoId(id + "_" + System.currentTimeMillis() + "_" + id.hashCode());
             return info;
         });
         chainNodeExecuteInfo.setStatus(ChainNodeStatus.fromChainDepStatus(chainDepStatus));
     }
 
     private Map<String, Object> parseOutputResult(List<Parameter> outputParameters, Map<String, Object> execute) {
+        if (outputParameters == null) {
+            return execute;
+        }
         Map<String, Object> result = new HashMap<>();
         List<String> validParameters = new ArrayList<>();
         for (Parameter parameter : outputParameters) {
@@ -982,10 +953,10 @@ public class Chain extends ChainNode {
 
                     if (executeInfoMap != null) {
                         completedNodes = (int) executeInfoMap.values().stream()
-                            .filter(info -> info.getStatus() == ChainNodeStatus.FINISHED ||
+                                .filter(info -> info.getStatus() == ChainNodeStatus.FINISHED ||
                                         info.getStatus() == ChainNodeStatus.FAILED ||
                                         info.getStatus() == ChainNodeStatus.SKIPPED)
-                            .count();
+                                .count();
                     }
 
                     notifyProgressUpdate(completedNodes, totalNodes);
@@ -1130,7 +1101,7 @@ public class Chain extends ChainNode {
         List<String> validParameters = new ArrayList<>();
         for (Parameter parameter : parameters) {
             Object value = null;
-            if (parameter.getRefType()== RefType.REF) {
+            if (parameter.getRefType() == RefType.REF) {
                 List<String> refValue = parameter.getRefValue();
                 if (refValue.size() >= 2) {
                     Object nodeResult = getMemory().get(refValue.get(0));
@@ -1139,7 +1110,7 @@ public class Chain extends ChainNode {
                         value = nodeResultMap.get(refValue.get(1));
                     }
                 }
-            }else {
+            } else {
                 value = parameter.getDefaultValue();
             }
             if (value == null) {
@@ -1155,5 +1126,9 @@ public class Chain extends ChainNode {
         }
 
         return result;
+    }
+
+    public void clearExecuteInfoMap(){
+        this.executeInfoMap.clear();
     }
 }

@@ -3,11 +3,12 @@ package cn.boommanpro.gaia.workflow.node.loop;
 import cn.boommanpro.gaia.workflow.model.Chain;
 import cn.boommanpro.gaia.workflow.node.BaseNode;
 import cn.boommanpro.gaia.workflow.node.NodeTypeEnum;
+import cn.boommanpro.gaia.workflow.param.Parameter;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,6 +32,11 @@ public class BlockEndNode extends BaseNode {
     @Override
     public NodeTypeEnum getNodeType() {
         return NodeTypeEnum.BLOCK_END;
+    }
+
+    @Override
+    public List<Parameter> getOutputParameters() {
+        return null;
     }
 }
 

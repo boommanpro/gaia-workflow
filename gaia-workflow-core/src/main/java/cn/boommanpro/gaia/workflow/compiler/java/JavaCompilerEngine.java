@@ -1,7 +1,6 @@
 package cn.boommanpro.gaia.workflow.compiler.java;
 
 
-import cn.hutool.json.JSONUtil;
 import cn.boommanpro.gaia.workflow.compiler.CompilerEngine;
 import cn.boommanpro.gaia.workflow.compiler.exception.CompileException;
 import cn.boommanpro.gaia.workflow.compiler.java.dependency.JavaCompiler;
@@ -9,6 +8,7 @@ import cn.boommanpro.gaia.workflow.compiler.java.dependency.MemoryClassLoader;
 import cn.boommanpro.gaia.workflow.compiler.pojo.CompileResult;
 import cn.boommanpro.gaia.workflow.compiler.pojo.CompilerCache;
 import cn.boommanpro.gaia.workflow.compiler.pojo.JavaCompilerResult;
+import cn.hutool.json.JSONUtil;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -32,7 +32,7 @@ public class JavaCompilerEngine implements CompilerEngine {
                 public CompileResult load(String script) throws Exception {
                     try {
                         JavaCompilerResult compile = javaCompiler.compile(script, new MemoryClassLoader());
-                        return CompileResult.success(compile.getMainClass(), compile.getClassList());
+                        return CompileResult.success(compile.getMainClass(),compile.getClazzCode(), compile.getClassList());
                     } catch (Exception e) {
                         return CompileResult.otherException(e);
                     }finally {
@@ -63,7 +63,7 @@ public class JavaCompilerEngine implements CompilerEngine {
 
         // 为每次加载创建新的ClassLoader避免状态污染
         MemoryClassLoader classLoader = new MemoryClassLoader();
-        
+
         for (Map.Entry<String, String> entry : encodeClassMap.entrySet()) {
             String className = entry.getKey();
             String base64Bytes = entry.getValue();

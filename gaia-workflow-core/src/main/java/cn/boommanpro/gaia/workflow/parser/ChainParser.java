@@ -11,12 +11,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -49,6 +44,7 @@ public class ChainParser {
         nodeParserMap.put(NodeTypeEnum.BLOCK_END.getCode(), new BlockEndNodeParser());
         nodeParserMap.put(NodeTypeEnum.CONTINUE.getCode(), new ContinueNodeParser());
         nodeParserMap.put(NodeTypeEnum.BREAK.getCode(), new BreakNodeParser());
+        nodeParserMap.put(NodeTypeEnum.WORKFLOW.getCode(), new WorkflowNodeParser());
     }
 
     public Map<String, NodeParser> getNodeParserMap() {
@@ -124,7 +120,7 @@ public class ChainParser {
         }
     }
 
-    private ChainEdge parseEdge(JSONObject edgeObject) {
+    public static ChainEdge parseEdge(JSONObject edgeObject) {
         if (edgeObject == null) return null;
         ChainEdge edge = new ChainEdge();
         edge.setId(String.format("%s_%s_%s", edgeObject.getStr("sourceNodeID"), edgeObject.getStr("targetNodeID"), edgeObject.getStr("sourcePortID")));

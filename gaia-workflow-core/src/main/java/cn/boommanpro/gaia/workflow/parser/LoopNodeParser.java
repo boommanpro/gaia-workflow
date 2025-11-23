@@ -1,6 +1,7 @@
 package cn.boommanpro.gaia.workflow.parser;
 
 import cn.boommanpro.gaia.workflow.GaiaWorkflow;
+import cn.boommanpro.gaia.workflow.model.ChainEdge;
 import cn.boommanpro.gaia.workflow.model.ChainNode;
 import cn.boommanpro.gaia.workflow.node.loop.LoopNode;
 import cn.hutool.json.JSONArray;
@@ -73,13 +74,13 @@ public class LoopNodeParser extends BaseNodeParser<LoopNode> {
         // 解析边
         JSONArray edgesJsonArray = (JSONArray) nodeJSONObject.getByPath(EDGES_PATH);
         if (edgesJsonArray != null) {
-            List<cn.boommanpro.gaia.workflow.model.ChainEdge> edges = new ArrayList<>();
+            List<ChainEdge> edges = new ArrayList<>();
             for (int i = 0; i < edgesJsonArray.size(); i++) {
                 JSONObject edgeJson = edgesJsonArray.getJSONObject(i);
-                cn.boommanpro.gaia.workflow.model.ChainEdge edge = parseChainEdge(edgeJson);
+                ChainEdge edge = ChainParser.parseEdge(edgeJson);
                 edges.add(edge);
             }
-            for (cn.boommanpro.gaia.workflow.model.ChainEdge edge : edges) {
+            for (ChainEdge edge : edges) {
                 loopNode.addEdge(edge);
             }
         }
@@ -190,17 +191,6 @@ public class LoopNodeParser extends BaseNodeParser<LoopNode> {
     }
 
 
-    /**
-     * 解析Chain边定义
-     */
-    private cn.boommanpro.gaia.workflow.model.ChainEdge parseChainEdge(JSONObject edgeJson) {
-        cn.boommanpro.gaia.workflow.model.ChainEdge edge = new cn.boommanpro.gaia.workflow.model.ChainEdge();
-        edge.setId(edgeJson.getStr("id"));
-        edge.setSource(edgeJson.getStr("sourceNodeID"));
-        edge.setTarget(edgeJson.getStr("targetNodeID"));
-        edge.setSourcePortID(edgeJson.getStr("sourcePortID"));
-        return edge;
-    }
 
     /**
      * 根据block类型创建对应的节点

@@ -4,14 +4,8 @@ import cn.boommanpro.gaia.workflow.GaiaWorkflow;
 import cn.boommanpro.gaia.workflow.listener.ChainExecutionListener;
 import cn.boommanpro.gaia.workflow.log.ChainNodeExecuteInfo;
 import cn.boommanpro.gaiaworkflow.executor.AsyncWorkflowExecutor;
-import cn.boommanpro.gaiaworkflow.executor.WorkflowExecutor;
 import cn.boommanpro.gaiaworkflow.input.TaskRunInput;
-import cn.boommanpro.gaiaworkflow.model.ErrorMessage;
-import cn.boommanpro.gaiaworkflow.model.Messages;
-import cn.boommanpro.gaiaworkflow.model.NodeReport;
-import cn.boommanpro.gaiaworkflow.model.NodeStatus;
-import cn.boommanpro.gaiaworkflow.model.Snapshot;
-import cn.boommanpro.gaiaworkflow.model.TaskInfo;
+import cn.boommanpro.gaiaworkflow.model.*;
 import cn.boommanpro.gaiaworkflow.repository.TaskRepository;
 import cn.hutool.json.JSONUtil;
 import org.slf4j.Logger;
@@ -57,7 +51,7 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
     private ApplicationContext applicationContext;
 
     @Autowired
-    public ThreadPoolAsyncWorkflowExecutor( TaskRepository taskRepository) {
+    public ThreadPoolAsyncWorkflowExecutor(TaskRepository taskRepository) {
         this.taskRepository = taskRepository;
     }
 
@@ -107,6 +101,7 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
                             logger.warn("更新节点状态失败, taskId: {}, nodeId: {}", taskId, nodeId, e);
                         }
                     }
+
                     @Override
                     public void onProgressUpdate(String chainId, Map<String, ChainNodeExecuteInfo> executeInfoMap,
                                                  int completedNodes, int totalNodes) {
@@ -186,7 +181,7 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
                     existingReport.setTimeCost(report.getTimeCost());
                 } else {
                     // 不存在则加入，包含完整的snapshot信息
-                     taskReport = new NodeReport(
+                    taskReport = new NodeReport(
                             report.getId(),
                             newStatus,
                             report.getStartTime(),
@@ -296,7 +291,7 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
      * @param exception 异常信息（如果有的话）
      */
     private void recordTestCallLog(String taskId, TaskInfo taskInfo, TaskRunInput input,
-                                  Map<String, Object> outputs, long costTime, Exception exception) {
+                                   Map<String, Object> outputs, long costTime, Exception exception) {
         try {
             String schema = input.getSchema();
             Map<String, Object> inputs = input.getInputs();
@@ -407,10 +402,10 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
      * 更新节点状态
      * 简化实现：只监听节点状态变更并存储
      *
-     * @param taskId       任务ID
-     * @param taskInfo     任务信息
-     * @param nodeId       节点ID
-     * @param executeInfo  节点执行信息
+     * @param taskId      任务ID
+     * @param taskInfo    任务信息
+     * @param nodeId      节点ID
+     * @param executeInfo 节点执行信息
      */
     private void updateNodeStatus(String taskId, TaskInfo taskInfo, String nodeId, ChainNodeExecuteInfo executeInfo) {
         try {
@@ -428,39 +423,23 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
             }
 
             String newStatus = convertNodeStatus(executeInfo.getStatus().name());
-            NodeReport existingReport = taskNodeReports.get(nodeId);
+            NodeReport report = taskNodeReports.getOrDefault(nodeId,  new NodeReport(
+                    executeInfo.getId(),
+                    newStatus,
+                    executeInfo.getStartTime(),
+                    executeInfo.getEndTime(),
+                    timeCost,
+                    new ArrayList<>()
+            ));
+            report.setStatus(newStatus);
+            report.setStartTime(executeInfo.getStartTime());
+            report.setEndTime(executeInfo.getEndTime());
+            report.setTimeCost(timeCost);
 
-            if (existingReport != null) {
-                // 更新现有节点的状态和时间信息
-                existingReport.setStatus(newStatus);
-                existingReport.setStartTime(executeInfo.getStartTime());
-                existingReport.setEndTime(executeInfo.getEndTime());
-                existingReport.setTimeCost(timeCost);
-
-                // 只有在节点完成时才创建和添加 snapshot
-                if (isNodeCompleted(executeInfo.getStatus())) {
-                    Snapshot snapshot = createSnapshot(executeInfo);
-                    addSnapshotToReport(existingReport, snapshot);
-                }
-            } else {
-                // 不存在则创建新的节点报告
-                ArrayList<Snapshot> snapshots = new ArrayList<>();
-
-                // 只有在节点完成时才创建 snapshot
-                if (isNodeCompleted(executeInfo.getStatus())) {
-                    Snapshot snapshot = createSnapshot(executeInfo);
-                    snapshots.add(snapshot);
-                }
-
-                NodeReport taskReport = new NodeReport(
-                        executeInfo.getId(),
-                        newStatus,
-                        executeInfo.getStartTime(),
-                        executeInfo.getEndTime(),
-                        timeCost,
-                        snapshots
-                );
-                taskNodeReports.put(nodeId, taskReport);
+            taskNodeReports.put(nodeId, report);
+            if (isNodeCompleted(executeInfo.getStatus())) {
+                Snapshot snapshot = createSnapshot(executeInfo,report.getSnapshots());
+                addSnapshotToReport(report, snapshot);
             }
 
             // 更新任务状态
@@ -480,22 +459,25 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
      */
     private boolean isNodeCompleted(cn.boommanpro.gaia.workflow.status.ChainNodeStatus status) {
         return status == cn.boommanpro.gaia.workflow.status.ChainNodeStatus.FINISHED ||
-               status == cn.boommanpro.gaia.workflow.status.ChainNodeStatus.FAILED ||
-               status == cn.boommanpro.gaia.workflow.status.ChainNodeStatus.SKIPPED;
+                status == cn.boommanpro.gaia.workflow.status.ChainNodeStatus.FAILED;
     }
 
     /**
      * 创建 snapshot 对象
      *
-     * @param info 节点执行信息
+     * @param info      节点执行信息
+     * @param snapshots
      * @return snapshot
      */
-    private Snapshot createSnapshot(ChainNodeExecuteInfo info) {
+    private Snapshot createSnapshot(ChainNodeExecuteInfo info, List<Snapshot> snapshots) {
         Snapshot snapshot = new Snapshot();
-
+        for (Snapshot temp : snapshots) {
+            if (temp.getId().equals(info.getExecuteInfoId())) {
+                snapshot = temp;
+            }
+        }
         // 使用节点ID和时间戳创建唯一ID
-        String uniqueExecutionId = info.getId() + "_" + System.currentTimeMillis() + "_" + info.hashCode();
-        snapshot.setId(uniqueExecutionId);
+        snapshot.setId(info.getExecuteInfoId());
         snapshot.setNodeID(info.getId());
 
         // 处理 inputs
@@ -556,6 +538,11 @@ public class ThreadPoolAsyncWorkflowExecutor implements AsyncWorkflowExecutor, A
         // 直接添加新的 snapshot
         // 这样循环节点的每次执行都会被记录
         // 而普通节点也会在每次完成时添加（符合预期）
+        for (Snapshot existingSnapshot : existingSnapshots) {
+            if (snapshot.getId().equals(existingSnapshot.getId())) {
+                return;
+            }
+        }
         existingSnapshots.add(snapshot);
     }
 

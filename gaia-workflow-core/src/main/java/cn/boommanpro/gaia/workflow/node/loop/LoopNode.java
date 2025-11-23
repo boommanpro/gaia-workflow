@@ -1,9 +1,11 @@
 package cn.boommanpro.gaia.workflow.node.loop;
 
 import cn.boommanpro.gaia.workflow.model.Chain;
+import cn.boommanpro.gaia.workflow.model.ChainEdge;
 import cn.boommanpro.gaia.workflow.model.ChainNode;
 import cn.boommanpro.gaia.workflow.param.Parameter;
 import cn.boommanpro.gaia.workflow.param.RefType;
+import cn.boommanpro.gaia.workflow.status.ChainEdgeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainNodeStatus;
 import cn.boommanpro.gaia.workflow.status.ChainStatus;
 import cn.boommanpro.gaia.workflow.tools.SpringExpressionParser;
@@ -14,12 +16,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * 循环节点，用于处理工作流中的循环逻辑
@@ -87,9 +84,11 @@ public class LoopNode extends Chain {
             resetIterationState();
 
             // 设置循环变量到内存
-            parent.getMemory().put("loop.item", currentLoopItem);
-            parent.getMemory().put("loop.index", currentLoopIndex);
-            parent.getMemory().put("loop.control", null);
+            HashMap<String, Object> localContent = new HashMap<>();
+            localContent.put("item", currentLoopItem);
+            localContent.put("index", currentLoopIndex);
+            localContent.put("control", null);
+            parent.getMemory().put(this.getId()+"_locals", localContent);
 
             try {
                 // 将 parent 的 memory 复制到当前 LoopNode 的 memory 中
@@ -98,11 +97,10 @@ public class LoopNode extends Chain {
 
                 // 执行子链逻辑
                 // 通过 executeForResult 来正确管理执行生命周期
-                Map<String, Object> iterationResult = this.executeForResult(this.getMemory(), true);
+                Map<String, Object> iterationResult = this.executeForResult(this.getMemory(), false);
 
                 // 将执行结果合并回 parent 的 memory
                 if (iterationResult != null) {
-                    parent.getMemory().putAll(iterationResult);
                     this.getMemory().putAll(iterationResult);
                 }
 
@@ -124,7 +122,7 @@ public class LoopNode extends Chain {
             } catch (Exception e) {
                 log.error("Error in loop iteration {}: {}", i, e.getMessage(), e);
                 // 循环中的错误应该中断整个循环
-                break;
+                throw new RuntimeException(e);
             }
         }
 
@@ -187,9 +185,17 @@ public class LoopNode extends Chain {
                 node.setStatus(ChainNodeStatus.READY);
             }
         }
+        if (this.getEdges()!=null) {
+            for (ChainEdge edge : this.getEdges()) {
+                edge.setStatus(ChainEdgeStatus.READY);
+            }
+        }
 
         // 清空节点上下文
         this.getNodeContexts().clear();
+        this.getMemory().clear();
+        this.getMemory().putAll(this.getParent().getMemory());
+        this.clearExecuteInfoMap();
     }
 
     /**
@@ -273,6 +279,9 @@ public class LoopNode extends Chain {
      * 获取输出值
      */
     private Object getOutputValue(LoopOutput loopOutput, Chain parent) {
+        Map<String, Object> context = new HashMap<>();
+        context.putAll(parent.getMemory());
+        context.putAll(this.getMemory());
         if ("ref".equals(loopOutput.getType())) {
             Object content = loopOutput.getContent();
             if (content instanceof List) {
@@ -285,7 +294,7 @@ public class LoopNode extends Chain {
                 } else if ("loop.index".equals(key)) {
                     return currentLoopIndex;
                 } else {
-                    return SpringExpressionParser.getInstance().getValue(key, parent.getMemory());
+                    return SpringExpressionParser.getInstance().getValue(key, context);
                 }
             }
         } else if ("constant".equals(loopOutput.getType())) {

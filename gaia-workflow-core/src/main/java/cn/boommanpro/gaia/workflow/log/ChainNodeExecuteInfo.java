@@ -18,6 +18,7 @@ import java.util.List;
 public class ChainNodeExecuteInfo {
 
     private String id;
+    private String executeInfoId;
     private NodeTypeEnum type;
     private String branch;
     private ChainNodeStatus status;
