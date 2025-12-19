@@ -9,8 +9,9 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
-        <module>gaia-workflow-core</module>
-        <module>gaia-workflow-server</module>
+        <module>gaia-workflow-base</module>
+        <module>gaia-workflow-infra</module>
+        <module>gaia-workflow-app</module>
     </modules>
 
     <properties>
