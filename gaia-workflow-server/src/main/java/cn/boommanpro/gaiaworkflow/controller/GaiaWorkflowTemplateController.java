@@ -6,7 +6,6 @@ import cn.boommanpro.gaiaworkflow.entity.GaiaWorkflowTemplate;
 import cn.boommanpro.gaiaworkflow.service.GaiaWorkflowTemplateAppService;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -54,6 +53,7 @@ public class GaiaWorkflowTemplateController {
     @PutMapping("/update")
     public boolean updateTemplate(@RequestBody GaiaWorkflowTemplateDto templateDto) {
         GaiaWorkflowTemplate template = GaiaWorkflowTemplateConverter.convertToEntity(templateDto);
+        template.setCreatedAt(null);
         return templateAppService.updateById(template);
     }
 
